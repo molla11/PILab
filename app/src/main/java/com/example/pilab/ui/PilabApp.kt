@@ -21,6 +21,7 @@ import com.example.pilab.ui.screens.ResultSummaryScreen
 import com.example.pilab.ui.screens.RunningTestScreen
 import com.example.pilab.ui.screens.ScenarioSelectScreen
 import com.example.pilab.ui.screens.SecurityReportScreen
+import com.example.pilab.ui.screens.SettingsScreen
 
 @Composable
 fun PilabApp() {
@@ -43,8 +44,17 @@ fun PilabApp() {
         composable(PilabRoute.Home.route) {
             HomeScreen(
                 viewModel = viewModel,
-                onStartTest = { navController.navigate(PilabRoute.ScenarioSelect.route) },
-                onHistory = { navController.navigate(PilabRoute.History.route) }
+                onStartTest = {
+                    viewModel.startNewTest()
+                    navController.navigate(PilabRoute.ScenarioSelect.route)
+                },
+                onHistory = { navController.navigate(PilabRoute.History.route) },
+                onSettings = { navController.navigate(PilabRoute.Settings.route) },
+                onOpenHistory = { historyId ->
+                    viewModel.loadHistory(historyId) {
+                        navController.navigate(PilabRoute.ResultSummary.route)
+                    }
+                }
             )
         }
         composable(PilabRoute.ScenarioSelect.route) {
@@ -116,6 +126,9 @@ fun PilabApp() {
                     }
                 }
             )
+        }
+        composable(PilabRoute.Settings.route) {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 }

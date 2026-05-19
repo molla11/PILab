@@ -19,6 +19,23 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withTimeout
 
+enum class AnalysisSource {
+    API,
+    MOCK
+}
+
+data class InjectionRunOutcome(
+    val result: InjectionTestResult,
+    val source: AnalysisSource,
+    val message: String? = null
+)
+
+data class ReportOutcome(
+    val report: SecurityReport,
+    val source: AnalysisSource,
+    val message: String? = null
+)
+
 class InjectionRepository(
     private val api: InjectionApi,
     private val dao: InjectionHistoryDao
@@ -27,7 +44,7 @@ class InjectionRepository(
         entities.map { it.toDomain() }
     }
 
-    suspend fun runTest(scenario: Scenario, prompt: String, level: TestLevel): InjectionTestResult {
+    suspend fun runTest(scenario: Scenario, prompt: String, level: TestLevel): InjectionRunOutcome {
         return runCatching {
             withTimeout(8_000) {
                 api.runInjectionTest(
@@ -39,7 +56,13 @@ class InjectionRepository(
                 ).toDomain()
             }
         }.getOrElse {
-            buildMockResult(prompt, level)
+            return InjectionRunOutcome(
+                result = buildMockResult(prompt, level),
+                source = AnalysisSource.MOCK,
+                message = "Backend unavailable. Used local mock analysis."
+            )
+        }.let {
+            InjectionRunOutcome(result = it, source = AnalysisSource.API)
         }
     }
 
@@ -70,12 +93,17 @@ class InjectionRepository(
 
     suspend fun getHistory(id: Long): InjectionHistory? = dao.getHistoryById(id)?.toDomain()
 
+    suspend fun deleteHistory(id: Long) {
+        dao.deleteReportsByHistoryId(id)
+        dao.deleteHistoryById(id)
+    }
+
     suspend fun generateReport(
         historyId: Long,
         scenario: Scenario,
         prompt: String,
         result: InjectionTestResult
-    ): SecurityReport {
+    ): ReportOutcome {
         val report = runCatching {
             withTimeout(8_000) {
                 val response = api.generateReport(
@@ -85,19 +113,26 @@ class InjectionRepository(
                         result = result.toDto()
                     )
                 )
-                SecurityReport(
+                ReportOutcome(
+                    report = SecurityReport(
                     summary = response.summary,
                     attackAnalysis = response.attackAnalysis,
                     modelComparison = response.modelComparison,
                     recommendations = response.recommendations
+                    ),
+                    source = AnalysisSource.API
                 )
             }
         }.getOrElse {
-            buildMockReport(scenario, result)
+            ReportOutcome(
+                report = buildMockReport(scenario, result),
+                source = AnalysisSource.MOCK,
+                message = "Backend unavailable. Used local mock report."
+            )
         }
 
         if (historyId > 0) {
-            dao.insertReport(report.toEntity(historyId))
+            dao.insertReport(report.report.toEntity(historyId))
         }
         return report
     }

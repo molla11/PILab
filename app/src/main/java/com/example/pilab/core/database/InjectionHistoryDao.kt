@@ -21,6 +21,12 @@ interface InjectionHistoryDao {
     @Delete
     suspend fun deleteHistory(history: InjectionHistoryEntity)
 
+    @Query("DELETE FROM injection_history WHERE id = :id")
+    suspend fun deleteHistoryById(id: Long)
+
+    @Query("DELETE FROM security_report WHERE historyId = :historyId")
+    suspend fun deleteReportsByHistoryId(historyId: Long)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReport(report: SecurityReportEntity): Long
 

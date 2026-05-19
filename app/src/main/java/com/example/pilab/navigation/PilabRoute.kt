@@ -10,4 +10,5 @@ sealed class PilabRoute(val route: String) {
     data object DetailScores : PilabRoute("detail-scores")
     data object SecurityReport : PilabRoute("security-report")
     data object History : PilabRoute("history")
+    data object Settings : PilabRoute("settings")
 }

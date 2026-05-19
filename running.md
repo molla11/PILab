@@ -30,3 +30,8 @@
 - Verified backend build with `npm.cmd run build`.
 - Added ignore rules for `server/node_modules/` and `server/dist/`.
 - Added `server/README.md` with endpoint and run instructions.
+- Started client 90% pass at user request.
+- Added client-side analysis/report source tracking so the UI can distinguish backend API responses from local mock fallback.
+- Prevented duplicate result saves and added status snackbars separate from error snackbars.
+- Added history deletion support, settings screen, recent-test direct opening, saved report re-open behavior, and visible client configuration/fallback information.
+- Verified the client 90% pass with `./gradlew.bat :app:assembleDebug` and `./gradlew.bat :app:testDebugUnitTest`; both succeed with the existing AGP 9 compatibility warnings.

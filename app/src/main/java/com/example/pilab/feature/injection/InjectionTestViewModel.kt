@@ -9,6 +9,7 @@ import com.example.pilab.core.model.InjectionTestResult
 import com.example.pilab.core.model.Scenario
 import com.example.pilab.core.model.SecurityReport
 import com.example.pilab.core.model.TestLevel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -25,6 +26,9 @@ data class InjectionTestUiState(
     val result: InjectionTestResult? = null,
     val report: SecurityReport? = null,
     val savedHistoryId: Long? = null,
+    val analysisSource: AnalysisSource? = null,
+    val reportSource: AnalysisSource? = null,
+    val statusMessage: String? = null,
     val errorMessage: String? = null
 )
 
@@ -37,12 +41,37 @@ class InjectionTestViewModel(
     val histories: StateFlow<List<InjectionHistory>> = repository.observeHistories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    fun startNewTest() {
+        _uiState.value = InjectionTestUiState()
+    }
+
     fun selectScenario(scenario: Scenario) {
-        _uiState.update { it.copy(selectedScenario = scenario, result = null, report = null, savedHistoryId = null) }
+        _uiState.update {
+            it.copy(
+                selectedScenario = scenario,
+                result = null,
+                report = null,
+                savedHistoryId = null,
+                analysisSource = null,
+                reportSource = null,
+                statusMessage = null
+            )
+        }
     }
 
     fun updatePrompt(prompt: String) {
-        _uiState.update { it.copy(prompt = prompt, errorMessage = null) }
+        _uiState.update {
+            it.copy(
+                prompt = prompt,
+                result = null,
+                report = null,
+                savedHistoryId = null,
+                analysisSource = null,
+                reportSource = null,
+                statusMessage = null,
+                errorMessage = null
+            )
+        }
     }
 
     fun loadExamplePrompt() {
@@ -74,19 +103,36 @@ class InjectionTestViewModel(
                     result = null,
                     report = null,
                     savedHistoryId = null,
+                    analysisSource = null,
+                    reportSource = null,
+                    statusMessage = null,
                     errorMessage = null
                 )
             }
-            _uiState.update { it.copy(currentStep = "Running ${state.selectedLevel.label} test") }
-            val result = repository.runTest(scenario, state.prompt, state.selectedLevel)
-            _uiState.update {
-                it.copy(
-                    isRunning = false,
-                    currentStep = "Analysis complete",
-                    result = result
-                )
+            try {
+                _uiState.update { it.copy(currentStep = "Running ${state.selectedLevel.label} test") }
+                val outcome = repository.runTest(scenario, state.prompt, state.selectedLevel)
+                _uiState.update {
+                    it.copy(
+                        isRunning = false,
+                        currentStep = "Analysis complete",
+                        result = outcome.result,
+                        analysisSource = outcome.source,
+                        statusMessage = outcome.message
+                    )
+                }
+                onComplete()
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isRunning = false,
+                        currentStep = null,
+                        errorMessage = exception.message ?: "Test failed."
+                    )
+                }
             }
-            onComplete()
         }
     }
 
@@ -98,9 +144,18 @@ class InjectionTestViewModel(
             _uiState.update { it.copy(errorMessage = "No result is available to save.") }
             return
         }
+        if (state.savedHistoryId != null) {
+            _uiState.update { it.copy(statusMessage = "Result is already saved.") }
+            return
+        }
         viewModelScope.launch {
-            val historyId = repository.saveResult(scenario, state.prompt, state.selectedLevel, result)
-            _uiState.update { it.copy(savedHistoryId = historyId, errorMessage = "Result saved to history.") }
+            runCatching {
+                repository.saveResult(scenario, state.prompt, state.selectedLevel, result)
+            }.onSuccess { historyId ->
+                _uiState.update { it.copy(savedHistoryId = historyId, statusMessage = "Result saved to history.") }
+            }.onFailure { throwable ->
+                _uiState.update { it.copy(errorMessage = throwable.message ?: "Could not save result.") }
+            }
         }
     }
 
@@ -112,25 +167,43 @@ class InjectionTestViewModel(
             _uiState.update { it.copy(errorMessage = "Run a test before generating a report.") }
             return
         }
+        if (state.report != null) {
+            onComplete()
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isRunning = true, currentStep = "Generating report", errorMessage = null) }
-            val historyId = repository.ensureSavedResult(
-                existingHistoryId = state.savedHistoryId,
-                scenario = scenario,
-                prompt = state.prompt,
-                level = state.selectedLevel,
-                result = result
-            )
-            val report = repository.generateReport(historyId, scenario, state.prompt, result)
-            _uiState.update {
-                it.copy(
-                    isRunning = false,
-                    currentStep = "Report ready",
-                    report = report,
-                    savedHistoryId = historyId
+            try {
+                val historyId = repository.ensureSavedResult(
+                    existingHistoryId = state.savedHistoryId,
+                    scenario = scenario,
+                    prompt = state.prompt,
+                    level = state.selectedLevel,
+                    result = result
                 )
+                val outcome = repository.generateReport(historyId, scenario, state.prompt, result)
+                _uiState.update {
+                    it.copy(
+                        isRunning = false,
+                        currentStep = "Report ready",
+                        report = outcome.report,
+                        savedHistoryId = historyId,
+                        reportSource = outcome.source,
+                        statusMessage = outcome.message
+                    )
+                }
+                onComplete()
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isRunning = false,
+                        currentStep = null,
+                        errorMessage = exception.message ?: "Could not generate report."
+                    )
+                }
             }
-            onComplete()
         }
     }
 
@@ -151,6 +224,9 @@ class InjectionTestViewModel(
                     result = history.result,
                     report = report,
                     savedHistoryId = history.id,
+                    analysisSource = null,
+                    reportSource = if (report == null) null else AnalysisSource.API,
+                    statusMessage = null,
                     errorMessage = null
                 )
             }
@@ -158,8 +234,30 @@ class InjectionTestViewModel(
         }
     }
 
+    fun deleteHistory(historyId: Long) {
+        viewModelScope.launch {
+            runCatching {
+                repository.deleteHistory(historyId)
+            }.onSuccess {
+                _uiState.update { state ->
+                    if (state.savedHistoryId == historyId) {
+                        InjectionTestUiState(statusMessage = "History item deleted.")
+                    } else {
+                        state.copy(statusMessage = "History item deleted.")
+                    }
+                }
+            }.onFailure { throwable ->
+                _uiState.update { it.copy(errorMessage = throwable.message ?: "Could not delete history item.") }
+            }
+        }
+    }
+
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    fun clearStatusMessage() {
+        _uiState.update { it.copy(statusMessage = null) }
     }
 
     class Factory(private val repository: InjectionRepository) : ViewModelProvider.Factory {

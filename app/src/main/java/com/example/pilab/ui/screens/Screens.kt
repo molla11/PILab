@@ -1,5 +1,6 @@
 package com.example.pilab.ui.screens
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,11 +19,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -43,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -53,12 +57,15 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.pilab.BuildConfig
 import com.example.pilab.core.data.Scenarios
 import com.example.pilab.core.model.DetailScores
 import com.example.pilab.core.model.InjectionHistory
 import com.example.pilab.core.model.InjectionTestResult
 import com.example.pilab.core.model.Scenario
 import com.example.pilab.core.model.TestLevel
+import com.example.pilab.feature.injection.AnalysisSource
+import com.example.pilab.feature.injection.InjectionTestUiState
 import com.example.pilab.feature.injection.InjectionTestViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -68,7 +75,9 @@ import java.util.Locale
 fun HomeScreen(
     viewModel: InjectionTestViewModel,
     onStartTest: () -> Unit,
-    onHistory: () -> Unit
+    onHistory: () -> Unit,
+    onSettings: () -> Unit,
+    onOpenHistory: (Long) -> Unit
 ) {
     val histories by viewModel.histories.collectAsState()
     PilabScaffold(title = "PILab") {
@@ -94,12 +103,17 @@ fun HomeScreen(
                 Spacer(Modifier.width(8.dp))
                 Text("History")
             }
+            OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Settings, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Settings")
+            }
             SectionTitle("Recent Tests")
             if (histories.isEmpty()) {
                 EmptyState("No saved tests yet.")
             } else {
                 histories.take(3).forEach { history ->
-                    HistoryCard(history = history, onOpen = onHistory)
+                    HistoryCard(history = history, onOpen = { onOpenHistory(history.id) })
                 }
             }
         }
@@ -254,6 +268,9 @@ fun ResultSummaryScreen(
                 RiskCard(result)
             }
             item {
+                ResultMetaPanel(state.analysisSource, state.savedHistoryId)
+            }
+            item {
                 SectionTitle("Attack Types")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     result.attackTypes.forEach { AssistChip(onClick = {}, label = { Text(it) }) }
@@ -274,7 +291,7 @@ fun ResultSummaryScreen(
                         Spacer(Modifier.width(6.dp))
                         Text("Details")
                     }
-                    Button(onClick = viewModel::saveResult, modifier = Modifier.weight(1f)) {
+                    Button(onClick = viewModel::saveResult, modifier = Modifier.weight(1f), enabled = state.savedHistoryId == null) {
                         Icon(Icons.Default.Save, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
                         Text(if (state.savedHistoryId == null) "Save" else "Saved")
@@ -284,7 +301,13 @@ fun ResultSummaryScreen(
                 Button(onClick = onReport, modifier = Modifier.fillMaxWidth(), enabled = !state.isRunning) {
                     Icon(Icons.Default.Security, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (state.isRunning) "Generating..." else "Generate Security Report")
+                    Text(
+                        when {
+                            state.isRunning -> "Generating..."
+                            state.report != null -> "View Security Report"
+                            else -> "Generate Security Report"
+                        }
+                    )
                 }
                 OutlinedButton(onClick = onBackHome, modifier = Modifier.fillMaxWidth()) {
                     Text("Home")
@@ -330,14 +353,21 @@ fun SecurityReportScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) 
             if (report == null) {
                 item { EmptyState("No report has been generated.") }
             } else {
+                if (state.reportSource != null) {
+                    item { ResultSourceChip("Report source", state.reportSource) }
+                }
                 item { InfoPanel("Summary", report.summary) }
                 item { InfoPanel("Attack Analysis", report.attackAnalysis) }
                 item { InfoPanel("Model Comparison", report.modelComparison) }
                 item {
                     SectionTitle("Recommendations")
-                    report.recommendations.forEachIndexed { index, recommendation ->
-                        Text("${index + 1}. $recommendation", style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.height(6.dp))
+                    if (report.recommendations.isEmpty()) {
+                        Text("No recommendations were included in this report.", style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        report.recommendations.forEachIndexed { index, recommendation ->
+                            Text("${index + 1}. $recommendation", style = MaterialTheme.typography.bodyMedium)
+                            Spacer(Modifier.height(6.dp))
+                        }
                     }
                 }
             }
@@ -364,9 +394,31 @@ fun HistoryScreen(
                 item { EmptyState("Saved results will appear here.") }
             } else {
                 items(histories) { history ->
-                    HistoryCard(history = history, onOpen = { onOpen(history.id) })
+                    HistoryCard(
+                        history = history,
+                        onOpen = { onOpen(history.id) },
+                        onDelete = { viewModel.deleteHistory(history.id) }
+                    )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun SettingsScreen(onBack: () -> Unit) {
+    PilabScaffold(title = "Settings", onBack = onBack) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            InfoPanel("API Base URL", BuildConfig.PILAB_BASE_URL)
+            InfoPanel("Fallback Mode", "When the backend is unavailable or times out, the client uses local mock analysis so the lab flow remains usable.")
+            InfoPanel("Local Storage", "Test results and generated reports are stored in the on-device Room database.")
+            InfoPanel("MVP Client Status", "Core client flow, persistence, report viewing, and history management are enabled. OpenRouter-backed scoring is handled by the server layer.")
         }
     }
 }
@@ -377,15 +429,22 @@ private fun PilabScaffold(
     title: String,
     onBack: (() -> Unit)? = null,
     viewModel: InjectionTestViewModel? = null,
-    content: @Composable (androidx.compose.foundation.layout.PaddingValues) -> Unit
+    content: @Composable (PaddingValues) -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
-    val state by (viewModel?.uiState?.collectAsState() ?: remember { MutableNoState })
+    val state by (viewModel?.uiState?.collectAsState() ?: remember { EmptyStateHolder })
     LaunchedEffect(state.errorMessage) {
         val message = state.errorMessage
         if (!message.isNullOrBlank()) {
             snackbarHostState.showSnackbar(message)
             viewModel?.clearError()
+        }
+    }
+    LaunchedEffect(state.statusMessage) {
+        val message = state.statusMessage
+        if (!message.isNullOrBlank()) {
+            snackbarHostState.showSnackbar(message)
+            viewModel?.clearStatusMessage()
         }
     }
     Scaffold(
@@ -406,7 +465,7 @@ private fun PilabScaffold(
     )
 }
 
-private val MutableNoState = androidx.compose.runtime.mutableStateOf(com.example.pilab.feature.injection.InjectionTestUiState())
+private val EmptyStateHolder: State<InjectionTestUiState> = androidx.compose.runtime.mutableStateOf(InjectionTestUiState())
 
 @Composable
 private fun ScenarioCard(scenario: Scenario, selected: Boolean, onClick: () -> Unit) {
@@ -466,6 +525,29 @@ private fun RiskCard(result: InjectionTestResult) {
 }
 
 @Composable
+private fun ResultMetaPanel(source: AnalysisSource?, historyId: Long?) {
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ResultSourceChip("Analysis source", source)
+            Text(
+                if (historyId == null) "Not saved to history yet." else "Saved as history item #$historyId.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+@Composable
+private fun ResultSourceChip(label: String, source: AnalysisSource?) {
+    val value = when (source) {
+        AnalysisSource.API -> "API"
+        AnalysisSource.MOCK -> "Local mock"
+        null -> "Saved result"
+    }
+    AssistChip(onClick = {}, label = { Text("$label: $value") })
+}
+
+@Composable
 private fun DetailScoresContent(scores: DetailScores) {
     ScoreRow("Instruction Override", scores.instructionOverride)
     ScoreRow("Role Hijacking", scores.roleHijacking)
@@ -492,13 +574,20 @@ private fun ScoreRow(label: String, score: Int) {
 }
 
 @Composable
-private fun HistoryCard(history: InjectionHistory, onOpen: () -> Unit) {
+private fun HistoryCard(history: InjectionHistory, onOpen: () -> Unit, onDelete: (() -> Unit)? = null) {
     OutlinedCard(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(formatDate(history.createdAt), style = MaterialTheme.typography.labelMedium)
-            Text(history.scenario, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text("Risk Score: ${history.result.finalRiskScore} ${history.result.riskLevel}")
-            Text(history.prompt, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+        Row(modifier = Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(formatDate(history.createdAt), style = MaterialTheme.typography.labelMedium)
+                Text(displayScenario(history.scenario), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Risk Score: ${history.result.finalRiskScore} ${history.result.riskLevel}")
+                Text(history.prompt, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+            }
+            if (onDelete != null) {
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete history")
+                }
+            }
         }
     }
 }
@@ -557,4 +646,8 @@ private fun riskColor(score: Int): Color = when (score) {
 
 private fun formatDate(value: Long): String {
     return SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(value))
+}
+
+private fun displayScenario(value: String): String {
+    return Scenarios.find(value)?.title ?: value
 }
