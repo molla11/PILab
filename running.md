@@ -54,3 +54,7 @@
 - Verified `POST /api/injection/report` returns `analysisSource: openrouter`.
 - Re-verified `npm.cmd run build`, `./gradlew.bat :app:assembleDebug`, and `./gradlew.bat :app:testDebugUnitTest`.
 - Fixed emulator connectivity path after testing: enabled Android cleartext HTTP traffic for `10.0.2.2:3000` and increased client API timeouts to 180 seconds because OpenRouter responses can exceed the previous 8 second client timeout.
+- Localized the Android application copy, scenario descriptions, example prompts, fallback analysis text, report labels, settings text, history text, and visible result labels to Korean.
+- Localized server OpenRouter instructions and fallback report/summary prompts to Korean while preserving JSON keys and fixed enum values required by the API contract.
+- Added Korean keyword detection to Android and server fallback analyzers so Korean prompt-injection examples still score correctly.
+- Verified localization changes with `npm.cmd run build`, `./gradlew.bat :app:assembleDebug`, and `./gradlew.bat :app:testDebugUnitTest`.

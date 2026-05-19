@@ -47,7 +47,7 @@ export class Agent extends EventEmitter<AgentEvents> {
     this.config = {
       apiKey: config.apiKey,
       model: config.model ?? 'openrouter/auto',
-      instructions: config.instructions ?? 'You are a helpful assistant.',
+      instructions: config.instructions ?? '당신은 사용자를 돕는 한국어 assistant입니다.',
       tools: config.tools ?? [],
       maxSteps: config.maxSteps ?? 5
     };
