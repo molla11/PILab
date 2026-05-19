@@ -18,7 +18,8 @@ data class InjectionTestResponseDto(
     val riskLevel: String,
     val attackTypes: List<String>,
     val levelResults: List<LevelResultDto>,
-    val detailScores: DetailScoresDto
+    val detailScores: DetailScoresDto,
+    val analysisSource: String? = null
 )
 
 @Serializable
@@ -52,7 +53,8 @@ data class SecurityReportResponseDto(
     val summary: String,
     val attackAnalysis: String,
     val modelComparison: String,
-    val recommendations: List<String>
+    val recommendations: List<String>,
+    val analysisSource: String? = null
 )
 
 fun InjectionTestResponseDto.toDomain() = InjectionTestResult(

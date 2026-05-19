@@ -25,8 +25,8 @@ Create `server/.env` from `.env.example` and set:
 
 ```env
 OPENROUTER_API_KEY=sk-or-...
-LOW_MODEL=google/gemini-3.1-flash-lite
-MEDIUM_MODEL=qwen/qwen3.6-flash
+LOW_MODEL=openai/gpt-3.5-turbo
+MEDIUM_MODEL=google/gemini-2.5-flash
 HIGH_MODEL=x-ai/grok-4.3
 ANALYZER_MODEL=qwen/qwen3.6-flash
 REPORT_MODEL=qwen/qwen3.6-max-preview
@@ -34,8 +34,8 @@ REPORT_MODEL=qwen/qwen3.6-max-preview
 
 Recommended model split:
 
-- `LOW_MODEL`: low-cost, fast model for lightweight defense evaluation.
-- `MEDIUM_MODEL`: Qwen flash-tier model for balanced analysis at low cost.
+- `LOW_MODEL`: low-cost GPT 3.5 baseline for lightweight defense evaluation.
+- `MEDIUM_MODEL`: Gemini 2.5 Flash for balanced analysis.
 - `HIGH_MODEL`: Grok 4.3 for stronger security judgment without GPT/Claude pricing.
 - `ANALYZER_MODEL`: Qwen flash-tier model for low-cost attack-type classification.
 - `REPORT_MODEL`: Qwen max preview for higher-quality report writing without GPT/Claude.

@@ -45,3 +45,11 @@
 - Queried the OpenRouter models API and selected default model ids for `LOW_MODEL`, `MEDIUM_MODEL`, `HIGH_MODEL`, `ANALYZER_MODEL`, and `REPORT_MODEL`.
 - Updated `server/.env.example` and `server/README.md` with the recommended model split.
 - Revised model choices to exclude GPT and Claude families for cost control.
+- User chose to keep `LOW_MODEL=openai/gpt-3.5-turbo`; updated server examples to match the selected runtime model split.
+- Added `.env` loading with `dotenv/config`, health endpoint model visibility without exposing the API key, and server response `analysisSource` fields so the Android UI can distinguish OpenRouter, server fallback, and local mock results.
+- Verified `GET /api/health` loads `.env` and reports `openRouterConfigured: true` with the selected model ids.
+- Fixed Agent Core request input handling to match OpenRouter Agent's string-input call pattern.
+- Verified `POST /api/injection/test` returns `analysisSource: openrouter` with the real OpenRouter key.
+- Added OpenRouter report-model retry candidates so a provider/model-specific failure retries other configured OpenRouter models before server fallback.
+- Verified `POST /api/injection/report` returns `analysisSource: openrouter`.
+- Re-verified `npm.cmd run build`, `./gradlew.bat :app:assembleDebug`, and `./gradlew.bat :app:testDebugUnitTest`.

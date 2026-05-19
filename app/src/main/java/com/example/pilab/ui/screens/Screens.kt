@@ -541,6 +541,8 @@ private fun ResultMetaPanel(source: AnalysisSource?, historyId: Long?) {
 private fun ResultSourceChip(label: String, source: AnalysisSource?) {
     val value = when (source) {
         AnalysisSource.API -> "API"
+        AnalysisSource.OPENROUTER -> "OpenRouter"
+        AnalysisSource.SERVER_FALLBACK -> "Server fallback"
         AnalysisSource.MOCK -> "Local mock"
         null -> "Saved result"
     }

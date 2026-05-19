@@ -28,6 +28,7 @@ export interface InjectionTestResponseDto {
   attackTypes: string[];
   levelResults: LevelResultDto[];
   detailScores: DetailScoresDto;
+  analysisSource?: 'openrouter' | 'server_fallback';
 }
 
 export interface SecurityReportRequestDto {
@@ -42,4 +43,5 @@ export interface SecurityReportResponseDto {
   attackAnalysis: string;
   modelComparison: string;
   recommendations: string[];
+  analysisSource?: 'openrouter' | 'server_fallback';
 }

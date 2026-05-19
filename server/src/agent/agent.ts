@@ -81,10 +81,7 @@ export class Agent extends EventEmitter<AgentEvents> {
       const result = client.callModel({
         model: this.config.model,
         instructions: this.config.instructions,
-        input: this.messages.map((message) => ({
-          role: message.role,
-          content: message.content
-        })),
+        input: content,
         tools: this.config.tools.length > 0 ? this.config.tools : undefined,
         stopWhen: [stepCountIs(this.config.maxSteps)]
       });
@@ -151,10 +148,7 @@ export class Agent extends EventEmitter<AgentEvents> {
       const result = client.callModel({
         model: this.config.model,
         instructions: this.config.instructions,
-        input: this.messages.map((message) => ({
-          role: message.role,
-          content: message.content
-        })),
+        input: content,
         tools: this.config.tools.length > 0 ? this.config.tools : undefined,
         stopWhen: [stepCountIs(this.config.maxSteps)]
       });

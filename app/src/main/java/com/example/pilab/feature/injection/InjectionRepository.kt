@@ -21,6 +21,8 @@ import kotlinx.coroutines.withTimeout
 
 enum class AnalysisSource {
     API,
+    OPENROUTER,
+    SERVER_FALLBACK,
     MOCK
 }
 
@@ -53,7 +55,7 @@ class InjectionRepository(
                         prompt = prompt,
                         level = level.wireValue
                     )
-                ).toDomain()
+                )
             }
         }.getOrElse {
             return InjectionRunOutcome(
@@ -62,7 +64,10 @@ class InjectionRepository(
                 message = "Backend unavailable. Used local mock analysis."
             )
         }.let {
-            InjectionRunOutcome(result = it, source = AnalysisSource.API)
+            InjectionRunOutcome(
+                result = it.toDomain(),
+                source = it.analysisSource.toAnalysisSource() ?: AnalysisSource.API
+            )
         }
     }
 
@@ -120,7 +125,7 @@ class InjectionRepository(
                     modelComparison = response.modelComparison,
                     recommendations = response.recommendations
                     ),
-                    source = AnalysisSource.API
+                    source = response.analysisSource.toAnalysisSource() ?: AnalysisSource.API
                 )
             }
         }.getOrElse {
@@ -230,5 +235,11 @@ class InjectionRepository(
     private fun scaled(value: Int, detected: Boolean): Int {
         val adjusted = if (detected) value + 12 else value - 10
         return adjusted.coerceIn(0, 100)
+    }
+
+    private fun String?.toAnalysisSource(): AnalysisSource? = when (this) {
+        "openrouter" -> AnalysisSource.OPENROUTER
+        "server_fallback" -> AnalysisSource.SERVER_FALLBACK
+        else -> null
     }
 }

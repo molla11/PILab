@@ -24,23 +24,35 @@ export class InjectionService {
   async runInjectionTest(request: InjectionTestRequestDto): Promise<InjectionTestResponseDto> {
     if (this.openRouterAgent) {
       try {
-        return await this.openRouterAgent.runInjectionTest(request);
+        return {
+          ...(await this.openRouterAgent.runInjectionTest(request)),
+          analysisSource: 'openrouter'
+        };
       } catch (error) {
         console.warn('OpenRouter injection test failed; using local fallback.', normalizeError(error));
       }
     }
-    return this.runLocalInjectionTest(request);
+    return {
+      ...this.runLocalInjectionTest(request),
+      analysisSource: 'server_fallback'
+    };
   }
 
   async generateReport(request: SecurityReportRequestDto): Promise<SecurityReportResponseDto> {
     if (this.openRouterAgent) {
       try {
-        return await this.openRouterAgent.generateReport(request);
+        return {
+          ...(await this.openRouterAgent.generateReport(request)),
+          analysisSource: 'openrouter'
+        };
       } catch (error) {
         console.warn('OpenRouter report generation failed; using local fallback.', normalizeError(error));
       }
     }
-    return this.generateLocalReport(request);
+    return {
+      ...this.generateLocalReport(request),
+      analysisSource: 'server_fallback'
+    };
   }
 
   private runLocalInjectionTest(request: InjectionTestRequestDto): InjectionTestResponseDto {
