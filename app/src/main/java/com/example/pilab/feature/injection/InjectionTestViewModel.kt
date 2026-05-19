@@ -114,8 +114,22 @@ class InjectionTestViewModel(
         }
         viewModelScope.launch {
             _uiState.update { it.copy(isRunning = true, currentStep = "Generating report", errorMessage = null) }
-            val report = repository.generateReport(state.savedHistoryId, scenario, state.prompt, result)
-            _uiState.update { it.copy(isRunning = false, currentStep = "Report ready", report = report) }
+            val historyId = repository.ensureSavedResult(
+                existingHistoryId = state.savedHistoryId,
+                scenario = scenario,
+                prompt = state.prompt,
+                level = state.selectedLevel,
+                result = result
+            )
+            val report = repository.generateReport(historyId, scenario, state.prompt, result)
+            _uiState.update {
+                it.copy(
+                    isRunning = false,
+                    currentStep = "Report ready",
+                    report = report,
+                    savedHistoryId = historyId
+                )
+            }
             onComplete()
         }
     }

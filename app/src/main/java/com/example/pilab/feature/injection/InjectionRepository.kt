@@ -58,10 +58,20 @@ class InjectionRepository(
         )
     }
 
+    suspend fun ensureSavedResult(
+        existingHistoryId: Long?,
+        scenario: Scenario,
+        prompt: String,
+        level: TestLevel,
+        result: InjectionTestResult
+    ): Long {
+        return existingHistoryId ?: saveResult(scenario, prompt, level, result)
+    }
+
     suspend fun getHistory(id: Long): InjectionHistory? = dao.getHistoryById(id)?.toDomain()
 
     suspend fun generateReport(
-        historyId: Long?,
+        historyId: Long,
         scenario: Scenario,
         prompt: String,
         result: InjectionTestResult
@@ -86,7 +96,7 @@ class InjectionRepository(
             buildMockReport(scenario, result)
         }
 
-        if (historyId != null && historyId > 0) {
+        if (historyId > 0) {
             dao.insertReport(report.toEntity(historyId))
         }
         return report

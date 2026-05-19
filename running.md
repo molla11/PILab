@@ -19,3 +19,14 @@
 - Next step: run unit tests and review the final worktree.
 - Verified `./gradlew.bat :app:testDebugUnitTest` succeeds. The same AGP 9 compatibility-mode deprecation warnings remain.
 - Current implementation status: Android MVP client is functional with Compose UI, scenario selection, prompt input, level selection, mock/API-backed test execution, result summary, detail scores, security report generation, Room-backed history, and Retrofit contracts for the planned backend.
+- Committed current MVP implementation: `fe575ec Implement Compose PILab MVP`.
+- Continuing with polish and contract hardening: move API base URL into `BuildConfig`, improve report persistence behavior, and keep validation passing.
+- Moved Android API base URL to `BuildConfig.PILAB_BASE_URL`.
+- Changed report generation to auto-save the test result first when there is no existing history id, so generated reports can be persisted and reopened from history.
+- Added a NestJS-style backend skeleton under `server/` with `GET /api/health`, `POST /api/injection/test`, and `POST /api/injection/report`.
+- Backend currently uses deterministic rule-based analysis matching the Android mock/DTO contract; OpenRouter integration remains a later step.
+- Verified Android again after polish: `./gradlew.bat :app:assembleDebug` and `./gradlew.bat :app:testDebugUnitTest` both succeed.
+- Installed backend dependencies with `npm.cmd install`; npm reported 0 vulnerabilities.
+- Verified backend build with `npm.cmd run build`.
+- Added ignore rules for `server/node_modules/` and `server/dist/`.
+- Added `server/README.md` with endpoint and run instructions.
