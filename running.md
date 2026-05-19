@@ -6,4 +6,16 @@
 - Confirmed the current project is a basic Android XML/AppCompat skeleton, while the plan requires a Compose-based PILab MVP.
 - Implementation direction: convert the Android client to Jetpack Compose, add navigation/state/repository/database/API layers, and provide a usable mock-backed flow when the backend is unavailable.
 - User requested this running progress log be accumulated in `running.md`.
-
+- Created initial Git commit before implementation: `9dc7fb5 Initial commit`.
+- Next step: update Gradle configuration for Kotlin, Compose, Navigation, Lifecycle, Retrofit, Kotlin Serialization, and Room.
+- Updated Gradle configuration for Kotlin, Compose, Navigation, Lifecycle, Retrofit, Kotlin Serialization, Room, KSP, and OkHttp logging.
+- Converted `MainActivity` from XML/AppCompat entry to a Compose `ComponentActivity`.
+- Added core domain models, built-in scenarios, Retrofit DTOs/API client, Room entities/DAO/database, repository, ViewModel, navigation routes, theme, and Compose screens for the MVP flow.
+- Next step: run Gradle build and fix compile/runtime integration issues.
+- Fixed AGP 9/KSP integration by disabling built-in Kotlin and new DSL compatibility mode in `gradle.properties`.
+- Fixed Kotlin/JVM target mismatch by setting the app module Kotlin toolchain to Java 11.
+- Fixed compile errors in serialization imports and Retrofit kotlinx serialization converter import.
+- Verified `./gradlew.bat :app:assembleDebug` succeeds. Remaining Gradle output is deprecation warnings from AGP 9 legacy DSL/KSP compatibility mode.
+- Next step: run unit tests and review the final worktree.
+- Verified `./gradlew.bat :app:testDebugUnitTest` succeeds. The same AGP 9 compatibility-mode deprecation warnings remain.
+- Current implementation status: Android MVP client is functional with Compose UI, scenario selection, prompt input, level selection, mock/API-backed test execution, result summary, detail scores, security report generation, Room-backed history, and Retrofit contracts for the planned backend.
