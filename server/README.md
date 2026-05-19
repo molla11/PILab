@@ -25,11 +25,19 @@ Create `server/.env` from `.env.example` and set:
 
 ```env
 OPENROUTER_API_KEY=sk-or-...
-LOW_MODEL=openrouter/auto
-MEDIUM_MODEL=openrouter/auto
-HIGH_MODEL=openrouter/auto
-ANALYZER_MODEL=openrouter/auto
-REPORT_MODEL=openrouter/auto
+LOW_MODEL=google/gemini-3.1-flash-lite
+MEDIUM_MODEL=qwen/qwen3.6-flash
+HIGH_MODEL=x-ai/grok-4.3
+ANALYZER_MODEL=qwen/qwen3.6-flash
+REPORT_MODEL=qwen/qwen3.6-max-preview
 ```
 
-Leave model values blank to use `openrouter/auto`.
+Recommended model split:
+
+- `LOW_MODEL`: low-cost, fast model for lightweight defense evaluation.
+- `MEDIUM_MODEL`: Qwen flash-tier model for balanced analysis at low cost.
+- `HIGH_MODEL`: Grok 4.3 for stronger security judgment without GPT/Claude pricing.
+- `ANALYZER_MODEL`: Qwen flash-tier model for low-cost attack-type classification.
+- `REPORT_MODEL`: Qwen max preview for higher-quality report writing without GPT/Claude.
+
+Leave model values blank in the runtime environment to use `openrouter/auto`.

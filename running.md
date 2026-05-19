@@ -42,3 +42,6 @@
 - Kept local deterministic analysis as fallback when `OPENROUTER_API_KEY` is missing or OpenRouter returns invalid/unparseable output.
 - Verified `npm.cmd run build` succeeds.
 - Verified runtime server health endpoint and fallback injection test endpoint by launching `dist/main.js` temporarily.
+- Queried the OpenRouter models API and selected default model ids for `LOW_MODEL`, `MEDIUM_MODEL`, `HIGH_MODEL`, `ANALYZER_MODEL`, and `REPORT_MODEL`.
+- Updated `server/.env.example` and `server/README.md` with the recommended model split.
+- Revised model choices to exclude GPT and Claude families for cost control.
