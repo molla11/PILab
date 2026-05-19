@@ -35,3 +35,10 @@
 - Prevented duplicate result saves and added status snackbars separate from error snackbars.
 - Added history deletion support, settings screen, recent-test direct opening, saved report re-open behavior, and visible client configuration/fallback information.
 - Verified the client 90% pass with `./gradlew.bat :app:assembleDebug` and `./gradlew.bat :app:testDebugUnitTest`; both succeed with the existing AGP 9 compatibility warnings.
+- Read and applied the OpenRouter create-agent skill from `https://openrouter.ai/skills/create-agent/SKILL.md`.
+- Installed `@openrouter/sdk`, `@openrouter/agent`, `zod`, and `eventemitter3` in the server project.
+- Added a modular server-side Agent Core with hooks/events and OpenRouter Agent `callModel` usage.
+- Added `OpenRouterAnalysisAgent` for injection level analysis, attack type classification, and report generation.
+- Kept local deterministic analysis as fallback when `OPENROUTER_API_KEY` is missing or OpenRouter returns invalid/unparseable output.
+- Verified `npm.cmd run build` succeeds.
+- Verified runtime server health endpoint and fallback injection test endpoint by launching `dist/main.js` temporarily.

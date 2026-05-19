@@ -8,10 +8,42 @@ import {
   SecurityReportResponseDto,
   TestLevel
 } from './dto';
+import { OpenRouterAnalysisAgent } from './openrouter-analysis.agent';
 
 @Injectable()
 export class InjectionService {
-  runInjectionTest(request: InjectionTestRequestDto): InjectionTestResponseDto {
+  private readonly openRouterAgent?: OpenRouterAnalysisAgent;
+
+  constructor() {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (apiKey) {
+      this.openRouterAgent = new OpenRouterAnalysisAgent(apiKey);
+    }
+  }
+
+  async runInjectionTest(request: InjectionTestRequestDto): Promise<InjectionTestResponseDto> {
+    if (this.openRouterAgent) {
+      try {
+        return await this.openRouterAgent.runInjectionTest(request);
+      } catch (error) {
+        console.warn('OpenRouter injection test failed; using local fallback.', normalizeError(error));
+      }
+    }
+    return this.runLocalInjectionTest(request);
+  }
+
+  async generateReport(request: SecurityReportRequestDto): Promise<SecurityReportResponseDto> {
+    if (this.openRouterAgent) {
+      try {
+        return await this.openRouterAgent.generateReport(request);
+      } catch (error) {
+        console.warn('OpenRouter report generation failed; using local fallback.', normalizeError(error));
+      }
+    }
+    return this.generateLocalReport(request);
+  }
+
+  private runLocalInjectionTest(request: InjectionTestRequestDto): InjectionTestResponseDto {
     const attackTypes = this.detectAttackTypes(request.prompt);
     const baseScore = this.clamp(attackTypes.length * 16 + Math.floor(request.prompt.length / 8), 12, 92);
     const finalRiskScore = this.adjustScoreForLevel(baseScore, request.level);
@@ -27,7 +59,7 @@ export class InjectionService {
     };
   }
 
-  generateReport(request: SecurityReportRequestDto): SecurityReportResponseDto {
+  private generateLocalReport(request: SecurityReportRequestDto): SecurityReportResponseDto {
     return {
       summary: `${request.scenario} produced ${request.result.riskLevel} risk at ${request.result.finalRiskScore}/100.`,
       attackAnalysis: `Detected patterns: ${request.result.attackTypes.join(', ')}. Review whether user content is being treated as an instruction source.`,
@@ -135,4 +167,8 @@ export class InjectionService {
   private clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
   }
+}
+
+function normalizeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
