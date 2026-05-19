@@ -18,6 +18,8 @@ import com.example.pilab.core.network.toDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 enum class AnalysisSource {
     API,
@@ -29,6 +31,8 @@ enum class AnalysisSource {
 data class InjectionRunOutcome(
     val result: InjectionTestResult,
     val source: AnalysisSource,
+    val requestPayload: String,
+    val responsePayload: String,
     val message: String? = null
 )
 
@@ -46,31 +50,41 @@ class InjectionRepository(
         const val API_TIMEOUT_MS = 180_000L
     }
 
+    private val payloadJson = Json {
+        prettyPrint = true
+        encodeDefaults = true
+        ignoreUnknownKeys = true
+    }
+
     fun observeHistories(): Flow<List<InjectionHistory>> = dao.observeHistories().map { entities ->
         entities.map { it.toDomain() }
     }
 
     suspend fun runTest(scenario: Scenario, prompt: String, level: TestLevel): InjectionRunOutcome {
+        val request = InjectionTestRequestDto(
+            scenario = scenario.id.wireValue,
+            prompt = prompt,
+            level = level.wireValue
+        )
         return runCatching {
             withTimeout(API_TIMEOUT_MS) {
-                api.runInjectionTest(
-                    InjectionTestRequestDto(
-                        scenario = scenario.id.wireValue,
-                        prompt = prompt,
-                        level = level.wireValue
-                    )
-                )
+                api.runInjectionTest(request)
             }
         }.getOrElse {
+            val result = buildMockResult(prompt, level)
             return InjectionRunOutcome(
-                result = buildMockResult(prompt, level),
+                result = result,
                 source = AnalysisSource.MOCK,
+                requestPayload = payloadJson.encodeToString(request),
+                responsePayload = payloadJson.encodeToString(result),
                 message = "백엔드에 연결할 수 없어 로컬 모의 분석을 사용했습니다."
             )
         }.let {
             InjectionRunOutcome(
                 result = it.toDomain(),
-                source = it.analysisSource.toAnalysisSource() ?: AnalysisSource.API
+                source = it.analysisSource.toAnalysisSource() ?: AnalysisSource.API,
+                requestPayload = payloadJson.encodeToString(request),
+                responsePayload = payloadJson.encodeToString(it)
             )
         }
     }

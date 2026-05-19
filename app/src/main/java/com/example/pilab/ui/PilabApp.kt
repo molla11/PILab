@@ -13,6 +13,8 @@ import com.example.pilab.feature.injection.InjectionRepository
 import com.example.pilab.feature.injection.InjectionTestViewModel
 import com.example.pilab.navigation.PilabRoute
 import com.example.pilab.ui.screens.DetailScoresScreen
+import com.example.pilab.ui.screens.ChatTraceScreen
+import com.example.pilab.ui.screens.CurrentSetupScreen
 import com.example.pilab.ui.screens.HistoryScreen
 import com.example.pilab.ui.screens.HomeScreen
 import com.example.pilab.ui.screens.LevelSelectScreen
@@ -68,13 +70,15 @@ fun PilabApp() {
             PromptInputScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
-                onNext = { navController.navigate(PilabRoute.LevelSelect.route) }
+                onNext = { navController.navigate(PilabRoute.LevelSelect.route) },
+                onSetup = { navController.navigate(PilabRoute.CurrentSetup.route) }
             )
         }
         composable(PilabRoute.LevelSelect.route) {
             LevelSelectScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
+                onSetup = { navController.navigate(PilabRoute.CurrentSetup.route) },
                 onRun = {
                     navController.navigate(PilabRoute.RunningTest.route)
                     viewModel.runTest {
@@ -97,6 +101,7 @@ fun PilabApp() {
                     }
                 },
                 onDetails = { navController.navigate(PilabRoute.DetailScores.route) },
+                onTrace = { navController.navigate(PilabRoute.ChatTrace.route) },
                 onReport = {
                     viewModel.generateReport {
                         navController.navigate(PilabRoute.SecurityReport.route)
@@ -106,6 +111,18 @@ fun PilabApp() {
         }
         composable(PilabRoute.DetailScores.route) {
             DetailScoresScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(PilabRoute.CurrentSetup.route) {
+            CurrentSetupScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(PilabRoute.ChatTrace.route) {
+            ChatTraceScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() }
             )

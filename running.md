@@ -58,3 +58,9 @@
 - Localized server OpenRouter instructions and fallback report/summary prompts to Korean while preserving JSON keys and fixed enum values required by the API contract.
 - Added Korean keyword detection to Android and server fallback analyzers so Korean prompt-injection examples still score correctly.
 - Verified localization changes with `npm.cmd run build`, `./gradlew.bat :app:assembleDebug`, and `./gradlew.bat :app:testDebugUnitTest`.
+- Updated the app title presentation to `PILab: Prompt Injection Lab` and changed the primary action label to `Do Injection`.
+- Refined home copy and page composition around a clearer experiment workflow.
+- Added a pre-attack `현재 설정` screen showing scenario role, allowed/blocked actions, selected defense level, endpoint, and pending prompt.
+- Added a post-attack `요청/응답 로그` screen with chat-style bubbles for the client request JSON and server response JSON.
+- Stored the latest injection request/response payloads in client state so the result screen can navigate to the trace view.
+- Verified the new screens and payload tracing with `npm.cmd run build`, `./gradlew.bat :app:assembleDebug`, and `./gradlew.bat :app:testDebugUnitTest`.

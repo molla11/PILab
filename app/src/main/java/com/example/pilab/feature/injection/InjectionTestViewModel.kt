@@ -28,6 +28,8 @@ data class InjectionTestUiState(
     val savedHistoryId: Long? = null,
     val analysisSource: AnalysisSource? = null,
     val reportSource: AnalysisSource? = null,
+    val lastRequestPayload: String? = null,
+    val lastResponsePayload: String? = null,
     val statusMessage: String? = null,
     val errorMessage: String? = null
 )
@@ -54,6 +56,8 @@ class InjectionTestViewModel(
                 savedHistoryId = null,
                 analysisSource = null,
                 reportSource = null,
+                lastRequestPayload = null,
+                lastResponsePayload = null,
                 statusMessage = null
             )
         }
@@ -68,6 +72,8 @@ class InjectionTestViewModel(
                 savedHistoryId = null,
                 analysisSource = null,
                 reportSource = null,
+                lastRequestPayload = null,
+                lastResponsePayload = null,
                 statusMessage = null,
                 errorMessage = null
             )
@@ -105,6 +111,8 @@ class InjectionTestViewModel(
                     savedHistoryId = null,
                     analysisSource = null,
                     reportSource = null,
+                    lastRequestPayload = null,
+                    lastResponsePayload = null,
                     statusMessage = null,
                     errorMessage = null
                 )
@@ -118,6 +126,8 @@ class InjectionTestViewModel(
                         currentStep = "분석 완료",
                         result = outcome.result,
                         analysisSource = outcome.source,
+                        lastRequestPayload = outcome.requestPayload,
+                        lastResponsePayload = outcome.responsePayload,
                         statusMessage = outcome.message
                     )
                 }

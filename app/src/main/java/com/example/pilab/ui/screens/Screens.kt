@@ -88,15 +88,16 @@ fun HomeScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("프롬프트 인젝션 실험실", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("PILab: Prompt Injection Lab", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text(
-                "실제 LLM 서비스와 비슷한 시나리오에서 프롬프트 인젝션을 점검하고 위험 점수, 모델 단계별 결과, 보안 리포트를 확인합니다.",
+                "프롬프트가 시스템 경계를 흔드는 순간을 실험하고, 어떤 방어가 버티는지 결과와 대화 기록으로 확인합니다.",
                 style = MaterialTheme.typography.bodyLarge
             )
+            InfoPanel("오늘의 실험", "시나리오를 고르고 공격 프롬프트를 입력한 뒤, 실행 전 설정과 실행 후 요청/응답을 비교해 보세요.")
             Button(onClick = onStartTest, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.PlayArrow, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("인젝션 테스트")
+                Text("Do Injection")
             }
             OutlinedButton(onClick = onHistory, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.History, contentDescription = null)
@@ -153,7 +154,8 @@ fun ScenarioSelectScreen(
 fun PromptInputScreen(
     viewModel: InjectionTestViewModel,
     onBack: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
+    onSetup: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
     PilabScaffold(title = "프롬프트 입력", onBack = onBack, viewModel = viewModel) { padding ->
@@ -183,6 +185,11 @@ fun PromptInputScreen(
                     Text("다음")
                 }
             }
+            OutlinedButton(onClick = onSetup, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Security, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("현재 설정 보기")
+            }
         }
     }
 }
@@ -191,6 +198,7 @@ fun PromptInputScreen(
 fun LevelSelectScreen(
     viewModel: InjectionTestViewModel,
     onBack: () -> Unit,
+    onSetup: () -> Unit,
     onRun: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -211,10 +219,15 @@ fun LevelSelectScreen(
                 )
             }
             Spacer(Modifier.weight(1f))
+            OutlinedButton(onClick = onSetup, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Security, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("현재 설정 보기")
+            }
             Button(onClick = onRun, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.BugReport, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("테스트 실행")
+                Text("Do Injection")
             }
         }
     }
@@ -248,6 +261,7 @@ fun ResultSummaryScreen(
     viewModel: InjectionTestViewModel,
     onBackHome: () -> Unit,
     onDetails: () -> Unit,
+    onTrace: () -> Unit,
     onReport: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -291,6 +305,14 @@ fun ResultSummaryScreen(
                         Spacer(Modifier.width(6.dp))
                         Text("상세")
                     }
+                    OutlinedButton(onClick = onTrace, modifier = Modifier.weight(1f), enabled = state.lastRequestPayload != null) {
+                        Icon(Icons.Default.Description, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("대화 로그")
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     Button(onClick = viewModel::saveResult, modifier = Modifier.weight(1f), enabled = state.savedHistoryId == null) {
                         Icon(Icons.Default.Save, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
@@ -400,6 +422,83 @@ fun HistoryScreen(
                         onDelete = { viewModel.deleteHistory(history.id) }
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun CurrentSetupScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
+    val state by viewModel.uiState.collectAsState()
+    val scenario = state.selectedScenario
+    PilabScaffold(title = "현재 설정", onBack = onBack, viewModel = viewModel) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item {
+                InfoPanel("테스트 목적", "선택한 서비스 역할과 방어 수준을 기준으로 입력 프롬프트가 지시 무시, 역할 탈취, 프롬프트 유출을 유발하는지 확인합니다.")
+            }
+            item {
+                InfoPanel("시나리오", scenario?.title ?: "아직 선택되지 않았습니다.")
+            }
+            if (scenario != null) {
+                item { InfoPanel("현재 역할", scenario.role) }
+                item {
+                    SectionTitle("허용 행동")
+                    scenario.allowedActions.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
+                }
+                item {
+                    SectionTitle("차단 행동")
+                    scenario.blockedActions.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
+                }
+            }
+            item {
+                InfoPanel("방어 단계", "${levelLabelKo(state.selectedLevel.label)} - ${levelDescription(state.selectedLevel)}")
+            }
+            item {
+                InfoPanel("요청 대상", "${BuildConfig.PILAB_BASE_URL}api/injection/test")
+            }
+            item {
+                InfoPanel("프롬프트", state.prompt.ifBlank { "아직 입력된 프롬프트가 없습니다." })
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatTraceScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
+    val state by viewModel.uiState.collectAsState()
+    PilabScaffold(title = "요청/응답 로그", onBack = onBack, viewModel = viewModel) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item {
+                ChatBubble(
+                    label = "클라이언트 요청",
+                    body = state.lastRequestPayload ?: "아직 전송된 요청이 없습니다.",
+                    isUser = true
+                )
+            }
+            item {
+                ChatBubble(
+                    label = "서버 응답",
+                    body = state.lastResponsePayload ?: "아직 수신된 응답이 없습니다.",
+                    isUser = false
+                )
+            }
+            item {
+                InfoPanel(
+                    "해석",
+                    "이 화면은 앱이 서버에 보낸 JSON 요청과 서버가 반환한 JSON 응답을 그대로 보여줍니다. 실제 모델 내부 프롬프트 전체가 아니라, 앱과 백엔드 API 사이의 요청/응답 기록입니다."
+                )
             }
         }
     }
@@ -600,6 +699,27 @@ private fun InfoPanel(title: String, body: String) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(body, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun ChatBubble(label: String, body: String, isUser: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = if (isUser) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+            ),
+            border = CardDefaults.outlinedCardBorder(),
+            modifier = Modifier.fillMaxWidth(0.92f)
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Text(body, style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }
