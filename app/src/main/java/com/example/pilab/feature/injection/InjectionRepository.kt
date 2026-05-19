@@ -42,13 +42,17 @@ class InjectionRepository(
     private val api: InjectionApi,
     private val dao: InjectionHistoryDao
 ) {
+    private companion object {
+        const val API_TIMEOUT_MS = 180_000L
+    }
+
     fun observeHistories(): Flow<List<InjectionHistory>> = dao.observeHistories().map { entities ->
         entities.map { it.toDomain() }
     }
 
     suspend fun runTest(scenario: Scenario, prompt: String, level: TestLevel): InjectionRunOutcome {
         return runCatching {
-            withTimeout(8_000) {
+            withTimeout(API_TIMEOUT_MS) {
                 api.runInjectionTest(
                     InjectionTestRequestDto(
                         scenario = scenario.id.wireValue,
@@ -110,7 +114,7 @@ class InjectionRepository(
         result: InjectionTestResult
     ): ReportOutcome {
         val report = runCatching {
-            withTimeout(8_000) {
+            withTimeout(API_TIMEOUT_MS) {
                 val response = api.generateReport(
                     SecurityReportRequestDto(
                         scenario = scenario.id.wireValue,

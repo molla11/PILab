@@ -53,3 +53,4 @@
 - Added OpenRouter report-model retry candidates so a provider/model-specific failure retries other configured OpenRouter models before server fallback.
 - Verified `POST /api/injection/report` returns `analysisSource: openrouter`.
 - Re-verified `npm.cmd run build`, `./gradlew.bat :app:assembleDebug`, and `./gradlew.bat :app:testDebugUnitTest`.
+- Fixed emulator connectivity path after testing: enabled Android cleartext HTTP traffic for `10.0.2.2:3000` and increased client API timeouts to 180 seconds because OpenRouter responses can exceed the previous 8 second client timeout.
