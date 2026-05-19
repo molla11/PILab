@@ -95,6 +95,7 @@ fun PilabApp() {
         composable(PilabRoute.ResultSummary.route) {
             ResultSummaryScreen(
                 viewModel = viewModel,
+                onBack = { navController.popBackStack() },
                 onBackHome = {
                     navController.navigate(PilabRoute.Home.route) {
                         popUpTo(PilabRoute.Home.route) { inclusive = true }

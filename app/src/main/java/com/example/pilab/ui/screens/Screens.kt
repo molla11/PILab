@@ -262,6 +262,7 @@ fun RunningTestScreen(viewModel: InjectionTestViewModel) {
 @Composable
 fun ResultSummaryScreen(
     viewModel: InjectionTestViewModel,
+    onBack: () -> Unit,
     onBackHome: () -> Unit,
     onDetails: () -> Unit,
     onTrace: () -> Unit,
@@ -269,7 +270,7 @@ fun ResultSummaryScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val result = state.result
-    PilabScaffold(title = "테스트 결과", viewModel = viewModel) { padding ->
+    PilabScaffold(title = "테스트 결과", onBack = onBack, viewModel = viewModel) { padding ->
         if (result == null) {
             EmptyResult(modifier = Modifier.padding(padding), onBackHome = onBackHome)
             return@PilabScaffold

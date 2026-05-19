@@ -65,3 +65,4 @@
 - Stored the latest injection request/response payloads in client state so the result screen can navigate to the trace view.
 - Verified the new screens and payload tracing with `npm.cmd run build`, `./gradlew.bat :app:assembleDebug`, and `./gradlew.bat :app:testDebugUnitTest`.
 - Fixed the home page layout so the main page scrolls on smaller emulator/device screens.
+- Added a back navigation button to the result summary screen so history-opened test results can return to the previous page.
