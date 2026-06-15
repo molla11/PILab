@@ -11,6 +11,9 @@ export interface LevelResultDto {
   result: string;
   vulnerabilityScore: number;
   summary: string;
+  targetSystemPrompt?: string;
+  targetUserPrompt?: string;
+  targetResponse?: string;
 }
 
 export interface DetailScoresDto {
