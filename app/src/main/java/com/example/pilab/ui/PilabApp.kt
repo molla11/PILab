@@ -81,11 +81,16 @@ fun PilabApp() {
                 onSetup = { navController.navigate(PilabRoute.CurrentSetup.route) },
                 onRun = {
                     navController.navigate(PilabRoute.RunningTest.route)
-                    viewModel.runTest {
-                        navController.navigate(PilabRoute.ResultSummary.route) {
-                            popUpTo(PilabRoute.RunningTest.route) { inclusive = true }
+                    viewModel.runTest(
+                        onComplete = {
+                            navController.navigate(PilabRoute.ResultSummary.route) {
+                                popUpTo(PilabRoute.RunningTest.route) { inclusive = true }
+                            }
+                        },
+                        onFailure = {
+                            navController.popBackStack(PilabRoute.LevelSelect.route, inclusive = false)
                         }
-                    }
+                    )
                 }
             )
         }

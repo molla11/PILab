@@ -39,9 +39,25 @@ fun InjectionHistoryEntity.toDomain() = InjectionHistory(
     result = InjectionTestResult(
         finalRiskScore = finalRiskScore,
         riskLevel = riskLevel,
-        attackTypes = dbJson.decodeFromString(ListSerializer(String.serializer()), attackTypesJson),
-        detailScores = dbJson.decodeFromString(DetailScores.serializer(), detailScoresJson),
-        levelResults = dbJson.decodeFromString(ListSerializer(LevelResult.serializer()), levelResultsJson)
+        attackTypes = decodeOrDefault(
+            fallback = listOf("Potential Injection"),
+            decode = { dbJson.decodeFromString(ListSerializer(String.serializer()), attackTypesJson) }
+        ),
+        detailScores = decodeOrDefault(
+            fallback = DetailScores(0, 0, 0, 0, 0, finalRiskScore.coerceIn(0, 100)),
+            decode = { dbJson.decodeFromString(DetailScores.serializer(), detailScoresJson) }
+        ),
+        levelResults = decodeOrDefault(
+            fallback = listOf(
+                LevelResult(
+                    level = selectedLevel,
+                    result = "Unclear",
+                    vulnerabilityScore = finalRiskScore.coerceIn(0, 100),
+                    summary = "저장된 상세 단계 결과를 읽지 못해 요약 정보만 표시합니다."
+                )
+            ),
+            decode = { dbJson.decodeFromString(ListSerializer(LevelResult.serializer()), levelResultsJson) }
+        )
     ),
     createdAt = createdAt
 )
@@ -59,5 +75,12 @@ fun SecurityReportEntity.toDomain() = SecurityReport(
     summary = summary,
     attackAnalysis = analysis,
     modelComparison = modelComparison,
-    recommendations = dbJson.decodeFromString(ListSerializer(String.serializer()), recommendationJson)
+    recommendations = decodeOrDefault(
+        fallback = emptyList(),
+        decode = { dbJson.decodeFromString(ListSerializer(String.serializer()), recommendationJson) }
+    )
 )
+
+private inline fun <T> decodeOrDefault(fallback: T, decode: () -> T): T {
+    return runCatching(decode).getOrDefault(fallback)
+}

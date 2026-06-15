@@ -54,7 +54,10 @@ data class LevelResult(
     val level: String,
     val result: String,
     val vulnerabilityScore: Int,
-    val summary: String
+    val summary: String,
+    val targetSystemPrompt: String? = null,
+    val targetUserPrompt: String? = null,
+    val targetResponse: String? = null
 )
 
 @Serializable

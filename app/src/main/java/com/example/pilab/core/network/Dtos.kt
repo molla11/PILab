@@ -27,7 +27,10 @@ data class LevelResultDto(
     val level: String,
     val result: String,
     val vulnerabilityScore: Int,
-    val summary: String
+    val summary: String,
+    val targetSystemPrompt: String? = null,
+    val targetUserPrompt: String? = null,
+    val targetResponse: String? = null
 )
 
 @Serializable
@@ -66,7 +69,10 @@ fun InjectionTestResponseDto.toDomain() = InjectionTestResult(
             level = it.level,
             result = it.result,
             vulnerabilityScore = it.vulnerabilityScore,
-            summary = it.summary
+            summary = it.summary,
+            targetSystemPrompt = it.targetSystemPrompt,
+            targetUserPrompt = it.targetUserPrompt,
+            targetResponse = it.targetResponse
         )
     },
     detailScores = DetailScores(
@@ -88,7 +94,10 @@ fun InjectionTestResult.toDto() = InjectionTestResponseDto(
             level = it.level,
             result = it.result,
             vulnerabilityScore = it.vulnerabilityScore,
-            summary = it.summary
+            summary = it.summary,
+            targetSystemPrompt = it.targetSystemPrompt,
+            targetUserPrompt = it.targetUserPrompt,
+            targetResponse = it.targetResponse
         )
     },
     detailScores = DetailScoresDto(
