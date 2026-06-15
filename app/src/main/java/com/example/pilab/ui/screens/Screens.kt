@@ -1,8 +1,18 @@
 package com.example.pilab.ui.screens
 
+import android.animation.ValueAnimator
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,12 +31,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.FactCheck
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
@@ -33,25 +44,26 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -62,8 +74,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,6 +94,7 @@ import com.example.pilab.core.model.TestLevel
 import com.example.pilab.feature.injection.AnalysisSource
 import com.example.pilab.feature.injection.InjectionTestUiState
 import com.example.pilab.feature.injection.InjectionTestViewModel
+import com.example.pilab.ui.theme.TerminalColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -102,10 +118,18 @@ fun HomeScreen(
         ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "PILAB",
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        BlinkingCursor()
+                    }
                     Text(
-                        "Prompt Injection Lab",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
+                        "prompt-injection-lab:~$ run scenario-audit",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.secondary
                     )
                     Text(
                         "시나리오별 target assistant를 먼저 실행한 뒤 응답 근거로 프롬프트 인젝션 위험을 평가합니다.",
@@ -115,23 +139,26 @@ fun HomeScreen(
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = onStartTest, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("새 평가 시작")
-                    }
-                    OutlinedButton(onClick = onHistory, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.History, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("히스토리")
-                    }
+                    TerminalButton(
+                        label = "새 평가 시작",
+                        onClick = onStartTest,
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.PlayArrow
+                    )
+                    TerminalOutlinedButton(
+                        label = "히스토리",
+                        onClick = onHistory,
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.History
+                    )
                 }
                 Spacer(Modifier.height(10.dp))
-                OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.Settings, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("설정")
-                }
+                TerminalOutlinedButton(
+                    label = "설정",
+                    onClick = onSettings,
+                    modifier = Modifier.fillMaxWidth(),
+                    icon = Icons.Default.Settings
+                )
             }
             item {
                 InfoPanel(
@@ -210,30 +237,47 @@ fun PromptInputScreen(
                 value = state.prompt,
                 onValueChange = viewModel::updatePrompt,
                 label = { Text("검증할 공격 프롬프트") },
+                prefix = { Text("user@pilab:~$ ", color = MaterialTheme.colorScheme.secondary) },
                 supportingText = {
                     Text("사용자 입력, 문서, 코드 주석처럼 target assistant가 받을 수 있는 내용을 넣으세요.")
                 },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedLabelColor = MaterialTheme.colorScheme.secondary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    cursorColor = MaterialTheme.colorScheme.primary,
+                    focusedSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unfocusedSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                shape = RectangleShape,
                 minLines = 8,
                 modifier = Modifier.fillMaxWidth()
             )
             Text("${state.prompt.length}자", style = MaterialTheme.typography.labelMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = viewModel::loadExamplePrompt, modifier = Modifier.weight(1f)) {
-                    Text("예시 불러오기")
-                }
-                Button(
+                TerminalOutlinedButton(
+                    label = "예시 불러오기",
+                    onClick = viewModel::loadExamplePrompt,
+                    modifier = Modifier.weight(1f)
+                )
+                TerminalButton(
+                    label = "방어 단계 선택",
                     onClick = onNext,
                     modifier = Modifier.weight(1f),
                     enabled = state.prompt.isNotBlank()
-                ) {
-                    Text("방어 단계 선택")
-                }
+                )
             }
-            OutlinedButton(onClick = onSetup, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Security, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("현재 설정 보기")
-            }
+            TerminalOutlinedButton(
+                label = "현재 설정 보기",
+                onClick = onSetup,
+                modifier = Modifier.fillMaxWidth(),
+                icon = Icons.Default.Security
+            )
         }
     }
 }
@@ -260,24 +304,23 @@ fun LevelSelectScreen(
                     body = levelDescription(level),
                     selected = state.selectedLevel == level,
                     onClick = { viewModel.selectLevel(level) },
-                    icon = Icons.Default.FactCheck
+                    icon = Icons.AutoMirrored.Filled.FactCheck
                 )
             }
             Spacer(Modifier.weight(1f))
-            OutlinedButton(onClick = onSetup, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Info, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("현재 설정 검토")
-            }
-            Button(
+            TerminalOutlinedButton(
+                label = "현재 설정 검토",
+                onClick = onSetup,
+                modifier = Modifier.fillMaxWidth(),
+                icon = Icons.Default.Info
+            )
+            TerminalButton(
+                label = "평가 실행",
                 onClick = onRun,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = state.selectedScenario != null && state.prompt.isNotBlank() && !state.isRunning
-            ) {
-                Icon(Icons.Default.BugReport, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("평가 실행")
-            }
+                enabled = state.selectedScenario != null && state.prompt.isNotBlank() && !state.isRunning,
+                icon = Icons.Default.BugReport
+            )
         }
     }
 }
@@ -293,17 +336,26 @@ fun RunningTestScreen(viewModel: InjectionTestViewModel) {
                 .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                CircularProgressIndicator()
-                Text(state.currentStep ?: "분석 시작 중", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "${state.selectedScenario?.title.orEmpty()} | ${levelLabelKo(state.selectedLevel.label)}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    "모델 기반 분석은 네트워크와 모델 응답 시간에 따라 지연될 수 있습니다.",
-                    style = MaterialTheme.typography.bodySmall
-                )
+            TerminalPane(title = "RUNNING TEST", modifier = Modifier.fillMaxWidth()) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.outline
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("[RUN] ${state.currentStep ?: "분석 시작 중"}", style = MaterialTheme.typography.titleMedium)
+                        BlinkingCursor()
+                    }
+                    Text(
+                        "TARGET: ${state.selectedScenario?.title.orEmpty()} / LEVEL: ${levelLabelKo(state.selectedLevel.label)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Text(
+                        "모델 기반 분석은 네트워크와 모델 응답 시간에 따라 지연될 수 있습니다.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         }
     }
@@ -339,7 +391,7 @@ fun ResultSummaryScreen(
                 SectionTitle("탐지된 공격 유형")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     result.attackTypes.forEach {
-                        AssistChip(onClick = {}, label = { Text(attackTypeKo(it)) })
+                        TerminalTag(attackTypeKo(it))
                     }
                 }
             }
@@ -357,45 +409,39 @@ fun ResultSummaryScreen(
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(onClick = onDetails, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Assessment, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("상세 점수")
-                    }
-                    OutlinedButton(
+                    TerminalOutlinedButton(
+                        label = "상세 점수",
+                        onClick = onDetails,
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.Assessment
+                    )
+                    TerminalOutlinedButton(
+                        label = "대화/평가",
                         onClick = onTrace,
                         modifier = Modifier.weight(1f),
-                        enabled = state.lastRequestPayload != null || state.lastResponsePayload != null
-                    ) {
-                        Icon(Icons.Default.Description, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("대화/평가")
-                    }
+                        enabled = state.lastRequestPayload != null || state.lastResponsePayload != null,
+                        icon = Icons.Default.Description
+                    )
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(
+                    TerminalButton(
+                        label = if (state.savedHistoryId == null) "결과 저장" else "저장됨",
                         onClick = viewModel::saveResult,
                         modifier = Modifier.weight(1f),
-                        enabled = state.savedHistoryId == null
-                    ) {
-                        Icon(
-                            if (state.savedHistoryId == null) Icons.Default.Save else Icons.Default.CheckCircle,
-                            contentDescription = null
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(if (state.savedHistoryId == null) "결과 저장" else "저장됨")
-                    }
+                        enabled = state.savedHistoryId == null,
+                        icon = if (state.savedHistoryId == null) Icons.Default.Save else Icons.Default.CheckCircle
+                    )
                 }
                 Spacer(Modifier.height(10.dp))
-                Button(onClick = onReport, modifier = Modifier.fillMaxWidth(), enabled = !state.isRunning) {
-                    Icon(Icons.Default.Security, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(reportButtonLabel(state))
-                }
-                OutlinedButton(onClick = onBackHome, modifier = Modifier.fillMaxWidth()) {
-                    Text("홈으로")
-                }
+                TerminalButton(
+                    label = reportButtonLabel(state),
+                    onClick = onReport,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.isRunning,
+                    icon = Icons.Default.Security
+                )
+                TerminalOutlinedButton(label = "홈으로", onClick = onBackHome, modifier = Modifier.fillMaxWidth())
             }
         }
     }
@@ -497,6 +543,10 @@ fun HistoryScreen(
     pendingDelete?.let { history ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
+            shape = RectangleShape,
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.primary,
+            textContentColor = MaterialTheme.colorScheme.onSurface,
             title = { Text("히스토리 삭제") },
             text = { Text("${displayScenario(history.scenario)} 평가 결과를 삭제할까요? 연결된 리포트도 함께 삭제됩니다.") },
             confirmButton = {
@@ -504,14 +554,20 @@ fun HistoryScreen(
                     onClick = {
                         viewModel.deleteHistory(history.id)
                         pendingDelete = null
-                    }
+                    },
+                    shape = RectangleShape,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("삭제")
+                    Text("[ 삭제 ]")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) {
-                    Text("취소")
+                TextButton(
+                    onClick = { pendingDelete = null },
+                    shape = RectangleShape,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("[ 취소 ]")
                 }
             }
         )
@@ -555,6 +611,8 @@ fun CurrentSetupScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
 fun ChatTraceScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
     val state by viewModel.uiState.collectAsState()
     val result = state.result
+    val requestPayload = state.lastRequestPayload
+    val responsePayload = state.lastResponsePayload
     PilabScaffold(title = "대화와 평가", onBack = onBack, viewModel = viewModel) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -576,19 +634,16 @@ fun ChatTraceScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
                     ConversationEvaluationCard(levelResult)
                 }
                 item {
-                    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("API 디버그", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                            Text(
-                                "필요 시 서버 원문 JSON은 아래 요청/응답 페이로드로 확인할 수 있습니다.",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            if (!state.lastRequestPayload.isNullOrBlank()) {
-                                EvidenceBlock("클라이언트 요청 JSON", state.lastRequestPayload)
-                            }
-                            if (!state.lastResponsePayload.isNullOrBlank()) {
-                                EvidenceBlock("서버 응답 JSON", state.lastResponsePayload)
-                            }
+                    TerminalPane(title = "API DEBUG", modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            "필요 시 서버 원문 JSON은 아래 요청/응답 페이로드로 확인할 수 있습니다.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        if (!requestPayload.isNullOrBlank()) {
+                            EvidenceBlock("클라이언트 요청 JSON", requestPayload)
+                        }
+                        if (!responsePayload.isNullOrBlank()) {
+                            EvidenceBlock("서버 응답 JSON", responsePayload)
                         }
                     }
                 }
@@ -655,25 +710,212 @@ private fun PilabScaffold(
         }
     }
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
         topBar = {
-            TopAppBar(
-                title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")
+            Column {
+                TopAppBar(
+                    title = {
+                        Text(
+                            "> ${title.uppercase(Locale.KOREA)}",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    },
+                    navigationIcon = {
+                        if (onBack != null) {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "뒤로",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
-                    }
-                }
-            )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.primary,
+                        navigationIconContentColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outline)
+                )
+            }
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { snackbarData ->
+                Snackbar(
+                    snackbarData = snackbarData,
+                    shape = RectangleShape,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    actionColor = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+        },
         content = content
     )
 }
 
 private val EmptyStateHolder: State<InjectionTestUiState> =
     mutableStateOf(InjectionTestUiState())
+
+@Composable
+private fun TerminalButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    icon: ImageVector? = null
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 48.dp),
+        enabled = enabled,
+        shape = RectangleShape,
+        border = BorderStroke(1.dp, if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.background,
+            disabledContainerColor = MaterialTheme.colorScheme.surface,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        TerminalButtonContent(label = label, icon = icon)
+    }
+}
+
+@Composable
+private fun TerminalOutlinedButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    icon: ImageVector? = null
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 48.dp),
+        enabled = enabled,
+        shape = RectangleShape,
+        border = BorderStroke(1.dp, if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = MaterialTheme.colorScheme.primary,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        TerminalButtonContent(label = label, icon = icon)
+    }
+}
+
+@Composable
+private fun TerminalButtonContent(label: String, icon: ImageVector?) {
+    if (icon != null) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+    }
+    Text(
+        "[ $label ]",
+        style = MaterialTheme.typography.labelLarge,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
+}
+
+@Composable
+private fun TerminalPane(
+    title: String? = null,
+    modifier: Modifier = Modifier,
+    borderColor: Color = MaterialTheme.colorScheme.outline,
+    contentPadding: PaddingValues = PaddingValues(14.dp),
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = modifier,
+        shape = RectangleShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, borderColor)
+    ) {
+        Column(
+            modifier = Modifier.padding(contentPadding),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            content = {
+                if (!title.isNullOrBlank()) {
+                    TerminalPaneTitle(title)
+                }
+                content()
+            }
+        )
+    }
+}
+
+@Composable
+private fun TerminalSelectablePane(
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val borderColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RectangleShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, borderColor)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            content = content
+        )
+    }
+}
+
+@Composable
+private fun TerminalPaneTitle(title: String) {
+    Text(
+        "[ ${title.uppercase(Locale.KOREA)} ]",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.secondary
+    )
+}
+
+@Composable
+private fun BlinkingCursor(modifier: Modifier = Modifier) {
+    val cursorAlpha = if (ValueAnimator.areAnimatorsEnabled()) {
+        val transition = rememberInfiniteTransition(label = "terminal_cursor")
+        val alpha by transition.animateFloat(
+            initialValue = 1f,
+            targetValue = 0.2f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 700),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "terminal_cursor_alpha"
+        )
+        alpha
+    } else {
+        1f
+    }
+    Text(
+        "█",
+        modifier = modifier
+            .alpha(cursorAlpha)
+            .clearAndSetSemantics { },
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary
+    )
+}
 
 @Composable
 private fun ScenarioCard(scenario: Scenario, selected: Boolean, onClick: () -> Unit) {
@@ -698,20 +940,27 @@ private fun SelectableCard(
     onClick: () -> Unit,
     icon: ImageVector? = null
 ) {
-    Card(
+    TerminalSelectablePane(
+        selected = selected,
         onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-        ),
-        border = CardDefaults.outlinedCardBorder(),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             if (icon != null) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
+                Text(
+                    "${if (selected) "[OK]" else "[--]"} ${title.uppercase(Locale.KOREA)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
                 Text(body, style = MaterialTheme.typography.bodyMedium)
             }
         }
@@ -720,33 +969,42 @@ private fun SelectableCard(
 
 @Composable
 private fun RiskCard(result: InjectionTestResult) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = riskColor(result.finalRiskScore)),
-        modifier = Modifier.fillMaxWidth()
+    val tone = riskColor(result.finalRiskScore)
+    TerminalPane(
+        title = "RISK REPORT",
+        modifier = Modifier.fillMaxWidth(),
+        borderColor = tone,
+        contentPadding = PaddingValues(18.dp)
     ) {
-        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("최종 위험 점수", style = MaterialTheme.typography.labelLarge)
-            Text("${result.finalRiskScore} / 100", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-            Text("위험 등급: ${riskLevelKo(result.riskLevel)}", style = MaterialTheme.typography.titleMedium)
-            Text(riskDescription(result.finalRiskScore), style = MaterialTheme.typography.bodyMedium)
-        }
+        Text(
+            "SCORE: ${result.finalRiskScore} / 100",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = tone
+        )
+        Text(
+            "STATUS: ${riskLevelKo(result.riskLevel)}",
+            style = MaterialTheme.typography.titleMedium,
+            color = tone
+        )
+        TerminalProgressBar(score = result.finalRiskScore, color = tone)
+        Text(riskDescription(result.finalRiskScore), style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 @Composable
 private fun ResultMetaPanel(source: AnalysisSource?, historyId: Long?) {
-    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ResultSourceChip("분석 출처", source)
-            Text(
-                if (historyId == null) {
-                    "아직 히스토리에 저장되지 않았습니다."
-                } else {
-                    "히스토리 #$historyId 항목으로 저장되었습니다."
-                },
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
+    TerminalPane(title = "SESSION", modifier = Modifier.fillMaxWidth()) {
+        ResultSourceChip("분석 출처", source)
+        Text(
+            if (historyId == null) {
+                "[WARN] 아직 히스토리에 저장되지 않았습니다."
+            } else {
+                "[OK] 히스토리 #$historyId 항목으로 저장되었습니다."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (historyId == null) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
+        )
     }
 }
 
@@ -759,7 +1017,18 @@ private fun ResultSourceChip(label: String, source: AnalysisSource?) {
         AnalysisSource.MOCK -> "앱 내 휴리스틱"
         null -> "저장된 결과"
     }
-    AssistChip(onClick = {}, label = { Text("$label: $value") })
+    TerminalTag("$label: $value")
+}
+
+@Composable
+private fun TerminalTag(text: String, color: Color = MaterialTheme.colorScheme.primary) {
+    Box(
+        modifier = Modifier
+            .border(BorderStroke(1.dp, color), RectangleShape)
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+    ) {
+        Text("[ $text ]", style = MaterialTheme.typography.labelMedium, color = color)
+    }
 }
 
 @Composable
@@ -776,48 +1045,31 @@ private fun DetailScoresContent(scores: DetailScores) {
 
 @Composable
 private fun TargetEvidenceCard(levelResult: LevelResult) {
-    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                "${levelLabelKo(levelResult.level)} target 실행",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            EvidenceBlock("대상 시스템 프롬프트", levelResult.targetSystemPrompt ?: "제공되지 않았습니다.")
-            EvidenceBlock("공격 입력", levelResult.targetUserPrompt ?: "제공되지 않았습니다.")
-            EvidenceBlock("대상 응답", levelResult.targetResponse ?: "제공되지 않았습니다.")
-        }
+    TerminalPane(title = "${levelLabelKo(levelResult.level)} TARGET", modifier = Modifier.fillMaxWidth()) {
+        EvidenceBlock("대상 시스템 프롬프트", levelResult.targetSystemPrompt ?: "제공되지 않았습니다.")
+        EvidenceBlock("공격 입력", levelResult.targetUserPrompt ?: "제공되지 않았습니다.")
+        EvidenceBlock("대상 응답", levelResult.targetResponse ?: "제공되지 않았습니다.")
     }
 }
 
 @Composable
 private fun ConversationEvaluationCard(levelResult: LevelResult) {
-    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(
-                    "${levelLabelKo(levelResult.level)} 단계",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    "${levelResult.vulnerabilityScore}/100",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            ConversationBubble(
-                label = "사용자가 보낸 프롬프트",
-                body = levelResult.targetUserPrompt ?: "제공되지 않았습니다.",
-                isUser = true
-            )
-            ConversationBubble(
-                label = "서비스 응답",
-                body = levelResult.targetResponse ?: "제공되지 않았습니다.",
-                isUser = false
-            )
-            EvaluationBlock(levelResult)
+    TerminalPane(title = "${levelLabelKo(levelResult.level)} TRACE", modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("LEVEL", style = MaterialTheme.typography.labelLarge)
+            Text("${levelResult.vulnerabilityScore}/100", style = MaterialTheme.typography.labelLarge, color = riskColor(levelResult.vulnerabilityScore))
         }
+        ConversationBubble(
+            label = "사용자가 보낸 프롬프트",
+            body = levelResult.targetUserPrompt ?: "제공되지 않았습니다.",
+            isUser = true
+        )
+        ConversationBubble(
+            label = "서비스 응답",
+            body = levelResult.targetResponse ?: "제공되지 않았습니다.",
+            isUser = false
+        )
+        EvaluationBlock(levelResult)
     }
 }
 
@@ -828,45 +1080,36 @@ private fun ConversationBubble(label: String, body: String, isUser: Boolean) {
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = if (isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-            ),
-            modifier = Modifier.fillMaxWidth(0.94f)
+        Text("> $label", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        TerminalPane(
+            modifier = Modifier.fillMaxWidth(0.94f),
+            borderColor = if (isUser) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
         ) {
-            Text(
-                body,
-                modifier = Modifier.padding(14.dp),
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Text(body, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
 
 @Composable
 private fun EvaluationBlock(levelResult: LevelResult) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = riskColor(levelResult.vulnerabilityScore)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("평가", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Text(
-                "${resultLabelKo(levelResult.result)} · 위험 점수 ${levelResult.vulnerabilityScore}/100",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(levelResult.summary, style = MaterialTheme.typography.bodyMedium)
-        }
+    val tone = riskColor(levelResult.vulnerabilityScore)
+    TerminalPane(title = "EVALUATION", modifier = Modifier.fillMaxWidth(), borderColor = tone) {
+        Text(
+            "${resultLabelKo(levelResult.result)} / RISK ${levelResult.vulnerabilityScore}/100",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = tone
+        )
+        TerminalProgressBar(score = levelResult.vulnerabilityScore, color = tone)
+        Text(levelResult.summary, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 @Composable
 private fun EvidenceBlock(title: String, body: String) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
-        Text(body, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+        Text("> ${title.uppercase(Locale.KOREA)}", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
+        Text(body, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -875,14 +1118,9 @@ private fun ScoreRow(label: String, score: Int, description: String? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-            Text(score.toString(), style = MaterialTheme.typography.bodyMedium)
+            Text("$score/100", style = MaterialTheme.typography.bodyMedium, color = riskColor(score))
         }
-        LinearProgressIndicator(
-            progress = { score / 100f },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-        )
+        TerminalProgressBar(score = score, color = riskColor(score))
         if (!description.isNullOrBlank()) {
             Text(description, style = MaterialTheme.typography.bodySmall)
         }
@@ -890,18 +1128,33 @@ private fun ScoreRow(label: String, score: Int, description: String? = null) {
 }
 
 @Composable
+private fun TerminalProgressBar(score: Int, color: Color) {
+    val clamped = score.coerceIn(0, 100)
+    val filled = clamped / 10
+    val bar = buildString {
+        append("[")
+        repeat(filled) { append("|") }
+        repeat(10 - filled) { append(".") }
+        append("] ")
+        append(clamped)
+        append("%")
+    }
+    Text(bar, style = MaterialTheme.typography.bodyMedium, color = color)
+}
+
+@Composable
 private fun HistoryCard(history: InjectionHistory, onOpen: () -> Unit, onDelete: (() -> Unit)? = null) {
-    OutlinedCard(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    TerminalSelectablePane(selected = false, onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(formatDate(history.createdAt), style = MaterialTheme.typography.labelMedium)
+                Text(formatDate(history.createdAt), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
                 Text(displayScenario(history.scenario), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("위험 점수: ${history.result.finalRiskScore} / 100 (${riskLevelKo(history.result.riskLevel)})")
+                Text("RISK: ${history.result.finalRiskScore}/100 (${riskLevelKo(history.result.riskLevel)})", color = riskColor(history.result.finalRiskScore))
                 Text(history.prompt, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
             }
             if (onDelete != null) {
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "히스토리 삭제")
+                    Icon(Icons.Default.Delete, contentDescription = "히스토리 삭제", tint = MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -910,20 +1163,16 @@ private fun HistoryCard(history: InjectionHistory, onOpen: () -> Unit, onDelete:
 
 @Composable
 private fun InfoPanel(title: String, body: String) {
-    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(body, style = MaterialTheme.typography.bodyMedium)
-        }
+    TerminalPane(title = title, modifier = Modifier.fillMaxWidth()) {
+        Text(body, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 @Composable
 private fun BulletPanel(title: String, items: List<String>) {
-    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            items.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
+    TerminalPane(title = title, modifier = Modifier.fillMaxWidth()) {
+        items.forEachIndexed { index, item ->
+            Text("${(index + 1).toString().padStart(2, '0')}  $item", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -934,30 +1183,25 @@ private fun ChatBubble(label: String, body: String, isUser: Boolean) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = if (isUser) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
-            ),
-            border = CardDefaults.outlinedCardBorder(),
-            modifier = Modifier.fillMaxWidth(0.94f)
+        TerminalPane(
+            title = label,
+            modifier = Modifier.fillMaxWidth(0.94f),
+            borderColor = if (isUser) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
         ) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                Text(body, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
-            }
+            Text(body, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
         }
     }
 }
 
 @Composable
 private fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Text("> ${text.uppercase(Locale.KOREA)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 }
 
 @Composable
 private fun EmptyState(message: String) {
-    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-        Text(message, modifier = Modifier.padding(18.dp), style = MaterialTheme.typography.bodyMedium)
+    TerminalPane(title = "EMPTY", modifier = Modifier.fillMaxWidth(), borderColor = MaterialTheme.colorScheme.secondary) {
+        Text("[WARN] $message", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
     }
 }
 
@@ -972,7 +1216,7 @@ private fun EmptyResult(modifier: Modifier, onBackHome: () -> Unit) {
     ) {
         Text("표시할 평가 결과가 없습니다.")
         Spacer(Modifier.height(12.dp))
-        Button(onClick = onBackHome) { Text("홈으로") }
+        TerminalButton(label = "홈으로", onClick = onBackHome)
     }
 }
 
@@ -990,11 +1234,9 @@ private fun levelDescription(level: TestLevel): String = when (level) {
 }
 
 private fun riskColor(score: Int): Color = when (score) {
-    in 0..20 -> Color(0xFFDDEEDB)
-    in 21..40 -> Color(0xFFE8E8C8)
-    in 41..60 -> Color(0xFFFFE0A8)
-    in 61..80 -> Color(0xFFFFC4A3)
-    else -> Color(0xFFFFB4AB)
+    in 0..40 -> TerminalColors.Primary
+    in 41..70 -> TerminalColors.Secondary
+    else -> TerminalColors.Error
 }
 
 private fun riskDescription(score: Int): String = when (score) {
