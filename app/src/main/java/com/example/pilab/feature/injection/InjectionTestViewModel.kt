@@ -221,7 +221,7 @@ class InjectionTestViewModel(
             _uiState.update {
                 it.copy(
                     isRunning = true,
-                    currentStep = "보안 리포트를 만들고 있어요",
+                    currentStep = "평가 리포트를 만들고 있어요",
                     errorMessage = null,
                     statusMessage = null
                 )
@@ -238,11 +238,11 @@ class InjectionTestViewModel(
                 _uiState.update {
                     it.copy(
                         isRunning = false,
-                        currentStep = "보안 리포트 준비 완료",
+                        currentStep = "평가 리포트 준비 완료",
                         report = outcome.report,
                         savedHistoryId = historyId,
                         reportSource = outcome.source,
-                        statusMessage = outcome.message ?: "보안 리포트를 만들었어요."
+                        statusMessage = outcome.message ?: "평가 리포트를 만들었어요."
                     )
                 }
                 onComplete()
@@ -253,7 +253,7 @@ class InjectionTestViewModel(
                     it.copy(
                         isRunning = false,
                         currentStep = null,
-                        errorMessage = exception.message ?: "보안 리포트를 만들지 못했어요."
+                        errorMessage = exception.message ?: "평가 리포트를 만들지 못했어요."
                     )
                 }
             }
