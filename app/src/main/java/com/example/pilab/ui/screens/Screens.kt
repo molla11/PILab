@@ -706,7 +706,7 @@ fun ChatTraceScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
             item {
                 InfoPanel(
                     "로그 범위",
-                    "방어 수준별 target prompt, target response, 판정을 확인합니다. 원문 payload는 클라이언트와 백엔드 사이의 요청/응답입니다."
+                    "방어 수준별 system prompt, target prompt, target response, 판정을 확인합니다. 원문 payload는 클라이언트와 백엔드 사이의 요청/응답입니다."
                 )
             }
             if (result == null) {
@@ -1227,6 +1227,9 @@ private fun ConversationEvaluationCard(levelResult: LevelResult) {
             Text("잔여 취약성", style = MaterialTheme.typography.labelLarge)
             Text("${levelResult.vulnerabilityScore}/100", style = MaterialTheme.typography.labelLarge, color = riskColor(levelResult.vulnerabilityScore))
         }
+        levelResult.targetSystemPrompt?.takeIf { it.isNotBlank() }?.let { systemPrompt ->
+            SystemPromptBlock(systemPrompt)
+        }
         ConversationBubble(
             label = "사용자 입력",
             body = levelResult.targetUserPrompt ?: "없어요.",
@@ -1238,6 +1241,27 @@ private fun ConversationEvaluationCard(levelResult: LevelResult) {
             isUser = false
         )
         EvaluationBlock(levelResult)
+    }
+}
+
+@Composable
+private fun SystemPromptBlock(body: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text("> System Prompt", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        TerminalPane(
+            modifier = Modifier.fillMaxWidth(),
+            borderColor = MaterialTheme.colorScheme.secondary
+        ) {
+            Text(
+                body,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
