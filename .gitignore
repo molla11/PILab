@@ -17,3 +17,7 @@ server/node_modules/
 server/dist/
 server/.env
 server/.env.*
+server/.npm-cache/
+server/*.log
+window.xml
+.idea/deviceManager.xml

@@ -40,6 +40,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Security
@@ -99,6 +101,8 @@ import com.example.pilab.core.model.TestLevel
 import com.example.pilab.feature.injection.AnalysisSource
 import com.example.pilab.feature.injection.InjectionTestUiState
 import com.example.pilab.feature.injection.InjectionTestViewModel
+import com.example.pilab.feature.injection.TargetPromptPreview
+import com.example.pilab.feature.injection.buildTargetPromptPreviews
 import com.example.pilab.ui.theme.TerminalColors
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -243,6 +247,16 @@ fun PromptInputScreen(
                 title = "방어 수준",
                 body = "${levelLabelKo(state.selectedLevel.label)} - ${levelDescription(state.selectedLevel)}"
             )
+            state.selectedScenario?.let { scenario ->
+                PromptPreviewSection(
+                    previews = buildTargetPromptPreviews(
+                        scenario = scenario,
+                        attackPrompt = state.prompt,
+                        selectedLevel = state.selectedLevel
+                    ),
+                    viewModel = viewModel
+                )
+            }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     "user@pilab:~$",
@@ -672,6 +686,18 @@ fun CurrentSetupScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
             }
             item {
                 InfoPanel("방어 수준", "${levelLabelKo(state.selectedLevel.label)} - ${levelDescription(state.selectedLevel)}")
+            }
+            if (scenario != null) {
+                item {
+                    PromptPreviewSection(
+                        previews = buildTargetPromptPreviews(
+                            scenario = scenario,
+                            attackPrompt = state.prompt,
+                            selectedLevel = state.selectedLevel
+                        ),
+                        viewModel = viewModel
+                    )
+                }
             }
             item { InfoPanel("서버", BuildConfig.PILAB_BASE_URL) }
             item { InfoPanel("검증할 입력", state.prompt.ifBlank { "아직 입력이 없어요." }) }
@@ -1212,11 +1238,104 @@ private fun DetailScoresContent(scores: DetailScores) {
 }
 
 @Composable
+private fun PromptPreviewSection(
+    previews: List<TargetPromptPreview>,
+    viewModel: InjectionTestViewModel
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val copyText = buildPromptPreviewCopyText(previews)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        TerminalPane(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    "> 실제 평가 프롬프트",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (expanded) "평가 프롬프트 접기" else "평가 프롬프트 펼치기",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            Text(
+                "선택한 방어 수준에서 서버가 target assistant에 전달하는 system prompt와 사용자 입력 앞에 붙는 프롬프트입니다.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (!expanded) {
+                Text(
+                    "${previews.size}개 target prompt가 접혀 있어요.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+        }
+        if (expanded) {
+            CopyTextButton(
+                label = "프롬프트 전체 복사",
+                text = copyText,
+                copiedMessage = "평가 프롬프트를 복사했어요.",
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxWidth()
+            )
+            previews.forEach { preview ->
+                TerminalPane(
+                    title = "${levelLabelKo(preview.level.label)} target prompt",
+                    modifier = Modifier.fillMaxWidth(),
+                    borderColor = MaterialTheme.colorScheme.secondary
+                ) {
+                    EvidenceBlock("System Prompt", preview.systemPrompt.ifBlank { "없음" })
+                    EvidenceBlock("Target User Prompt", preview.userPrompt)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun TargetEvidenceCard(levelResult: LevelResult) {
-    TerminalPane(title = "${levelLabelKo(levelResult.level)} 실행 근거", modifier = Modifier.fillMaxWidth()) {
-        EvidenceBlock("시스템 지침", levelResult.targetSystemPrompt ?: "없어요.")
-        EvidenceBlock("검증 입력", levelResult.targetUserPrompt ?: "없어요.")
-        EvidenceBlock("응답", levelResult.targetResponse ?: "없어요.")
+    var expanded by remember { mutableStateOf(false) }
+    TerminalPane(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "[ ${levelLabelKo(levelResult.level).uppercase(Locale.KOREA)} 실행 근거 ]",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            IconButton(onClick = { expanded = !expanded }) {
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (expanded) "실행 근거 접기" else "실행 근거 펼치기",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        Text(
+            if (expanded) {
+                "target system prompt, target user prompt, target response를 표시합니다."
+            } else {
+                "system prompt, user prompt, response가 접혀 있어요."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (expanded) {
+            EvidenceBlock("시스템 지침", levelResult.targetSystemPrompt ?: "없어요.")
+            EvidenceBlock("검증 입력", levelResult.targetUserPrompt ?: "없어요.")
+            EvidenceBlock("응답", levelResult.targetResponse ?: "없어요.")
+        }
     }
 }
 
@@ -1422,7 +1541,7 @@ private fun reportButtonLabel(state: InjectionTestUiState): String = when {
 }
 
 private fun levelDescription(level: TestLevel): String = when (level) {
-    TestLevel.LOW -> "서비스 설정과 검증 입력이 같은 사용자 수준으로 전달되는 취약한 기준선입니다."
+    TestLevel.LOW -> "시스템 프롬프트 없이 기본 서비스 컨텍스트만 사용자 입력 앞에 붙입니다."
     TestLevel.MEDIUM -> "역할과 차단 행동을 시스템 지침에 두지만 QA/운영 점검 형식에는 흔들릴 수 있습니다."
     TestLevel.HIGH -> "지침과 데이터를 엄격히 분리하고 차단 행동을 명시적으로 거절합니다."
     TestLevel.ALL -> "낮음, 중간, 높음을 모두 실행해 비교합니다."
@@ -1516,6 +1635,20 @@ private fun buildReportCopyText(
         report.recommendations.forEach { recommendation ->
             appendLine("- $recommendation")
         }
+    }
+}
+
+private fun buildPromptPreviewCopyText(previews: List<TargetPromptPreview>): String = buildString {
+    appendLine("# PILab Target Prompt Preview")
+    previews.forEach { preview ->
+        appendLine()
+        appendLine("## ${levelLabelKo(preview.level.label)}")
+        appendLine()
+        appendLine("### System Prompt")
+        appendLine(preview.systemPrompt.ifBlank { "없음" })
+        appendLine()
+        appendLine("### Target User Prompt")
+        appendLine(preview.userPrompt)
     }
 }
 
