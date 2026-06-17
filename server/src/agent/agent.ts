@@ -1,5 +1,7 @@
-import type { StreamableOutputItem, Tool } from '@openrouter/agent';
 import { EventEmitter } from 'eventemitter3';
+
+type StreamableOutputItem = unknown;
+type Tool = unknown;
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -76,53 +78,9 @@ export class Agent extends EventEmitter<AgentEvents> {
     this.emit('thinking:start');
 
     try {
-      const { stepCountIs } = await loadOpenRouterAgentRuntime();
-      const client = await this.getClient();
-      const result = client.callModel({
-        model: this.config.model,
-        instructions: this.config.instructions,
-        input: content,
-        tools: this.config.tools.length > 0 ? this.config.tools : undefined,
-        stopWhen: [stepCountIs(this.config.maxSteps)]
-      });
-
       this.emit('stream:start');
-      let fullText = '';
-
-      for await (const item of result.getItemsStream()) {
-        this.emit('item:update', item);
-        switch (item.type) {
-          case 'message': {
-            const textContent = item.content?.find((contentItem: { type: string }) => contentItem.type === 'output_text');
-            if (textContent && 'text' in textContent && textContent.text !== fullText) {
-              const delta = textContent.text.slice(fullText.length);
-              fullText = textContent.text;
-              this.emit('stream:delta', delta, fullText);
-            }
-            break;
-          }
-          case 'function_call':
-            if (item.status === 'completed') {
-              this.emit('tool:call', item.name, safeParseJson(item.arguments ?? '{}'));
-            }
-            break;
-          case 'function_call_output':
-            this.emit('tool:result', item.callId, item.output);
-            break;
-          case 'reasoning': {
-            const reasoningText = item.content?.find((contentItem: { type: string }) => contentItem.type === 'reasoning_text');
-            if (reasoningText && 'text' in reasoningText) {
-              this.emit('reasoning:update', reasoningText.text);
-            }
-            break;
-          }
-        }
-      }
-
-      if (!fullText) {
-        fullText = await result.getText();
-      }
-
+      const fullText = await this.callModel(content);
+      this.emit('stream:delta', fullText, fullText);
       this.emit('stream:end', fullText);
       const assistantMessage: Message = { role: 'assistant', content: fullText };
       this.messages.push(assistantMessage);
@@ -143,16 +101,7 @@ export class Agent extends EventEmitter<AgentEvents> {
     this.emit('message:user', userMessage);
 
     try {
-      const { stepCountIs } = await loadOpenRouterAgentRuntime();
-      const client = await this.getClient();
-      const result = client.callModel({
-        model: this.config.model,
-        instructions: this.config.instructions,
-        input: content,
-        tools: this.config.tools.length > 0 ? this.config.tools : undefined,
-        stopWhen: [stepCountIs(this.config.maxSteps)]
-      });
-      const fullText = await result.getText();
+      const fullText = await this.callModel(content);
       const assistantMessage: Message = { role: 'assistant', content: fullText };
       this.messages.push(assistantMessage);
       this.emit('message:assistant', assistantMessage);
@@ -164,12 +113,37 @@ export class Agent extends EventEmitter<AgentEvents> {
     }
   }
 
-  private async getClient(): Promise<OpenRouterClient> {
-    if (!this.client) {
-      const { OpenRouter } = await loadOpenRouterAgentRuntime();
-      this.client = new OpenRouter({ apiKey: this.config.apiKey });
+  private async callModel(content: string): Promise<string> {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.config.apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://api.molla.kr',
+        'X-Title': 'PILab'
+      },
+      body: JSON.stringify({
+        model: this.config.model,
+        messages: [
+          { role: 'system', content: this.config.instructions },
+          { role: 'user', content }
+        ]
+      })
+    });
+
+    const raw = await response.text();
+    if (!response.ok) {
+      throw new Error(`OpenRouter HTTP ${response.status}: ${redactSecrets(raw, this.config.apiKey)}`);
     }
-    return this.client as OpenRouterClient;
+
+    const parsed = safeParseJson(raw) as OpenRouterChatCompletionResponse;
+    const message = parsed.choices?.[0]?.message;
+    const text = message?.content;
+    if (typeof text === 'string' && text.trim().length > 0) {
+      return text;
+    }
+
+    throw new Error(`OpenRouter response did not contain output text: ${redactSecrets(raw, this.config.apiKey).slice(0, 1000)}`);
   }
 }
 
@@ -185,14 +159,16 @@ function safeParseJson(value: string): unknown {
   }
 }
 
-type OpenRouterAgentRuntime = typeof import('@openrouter/agent');
-type OpenRouterClient = InstanceType<OpenRouterAgentRuntime['OpenRouter']>;
+type OpenRouterChatCompletionResponse = {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+    };
+  }>;
+};
 
-let runtimePromise: Promise<OpenRouterAgentRuntime> | undefined;
-
-function loadOpenRouterAgentRuntime(): Promise<OpenRouterAgentRuntime> {
-  runtimePromise ??= (new Function('specifier', 'return import(specifier)') as (
-    specifier: string
-  ) => Promise<OpenRouterAgentRuntime>)('@openrouter/agent');
-  return runtimePromise;
+function redactSecrets(value: string, apiKey: string): string {
+  return value
+    .replaceAll(apiKey, '[redacted]')
+    .replace(/sk-or-v1-[A-Za-z0-9]+/g, '[redacted]');
 }
