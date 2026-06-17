@@ -38,6 +38,19 @@ fun PilabApp() {
         factory = InjectionTestViewModel.Factory(repository)
     )
     val navController = rememberNavController()
+    val runInjectionTest = {
+        navController.navigate(PilabRoute.RunningTest.route)
+        viewModel.runTest(
+            onComplete = {
+                navController.navigate(PilabRoute.ResultSummary.route) {
+                    popUpTo(PilabRoute.RunningTest.route) { inclusive = true }
+                }
+            },
+            onFailure = {
+                navController.popBackStack(PilabRoute.LevelSelect.route, inclusive = false)
+            }
+        )
+    }
 
     NavHost(
         navController = navController,
@@ -63,15 +76,16 @@ fun PilabApp() {
             ScenarioSelectScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
-                onNext = { navController.navigate(PilabRoute.PromptInput.route) }
+                onNext = { navController.navigate(PilabRoute.LevelSelect.route) }
             )
         }
         composable(PilabRoute.PromptInput.route) {
             PromptInputScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
-                onNext = { navController.navigate(PilabRoute.LevelSelect.route) },
-                onSetup = { navController.navigate(PilabRoute.CurrentSetup.route) }
+                onChangeLevel = { navController.navigate(PilabRoute.LevelSelect.route) },
+                onSetup = { navController.navigate(PilabRoute.CurrentSetup.route) },
+                onRun = runInjectionTest
             )
         }
         composable(PilabRoute.LevelSelect.route) {
@@ -79,19 +93,12 @@ fun PilabApp() {
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onSetup = { navController.navigate(PilabRoute.CurrentSetup.route) },
-                onRun = {
-                    navController.navigate(PilabRoute.RunningTest.route)
-                    viewModel.runTest(
-                        onComplete = {
-                            navController.navigate(PilabRoute.ResultSummary.route) {
-                                popUpTo(PilabRoute.RunningTest.route) { inclusive = true }
-                            }
-                        },
-                        onFailure = {
-                            navController.popBackStack(PilabRoute.LevelSelect.route, inclusive = false)
-                        }
-                    )
-                }
+                onInput = {
+                    if (!navController.popBackStack(PilabRoute.PromptInput.route, inclusive = false)) {
+                        navController.navigate(PilabRoute.PromptInput.route)
+                    }
+                },
+                onRun = runInjectionTest
             )
         }
         composable(PilabRoute.RunningTest.route) {
@@ -151,7 +158,10 @@ fun PilabApp() {
             )
         }
         composable(PilabRoute.Settings.route) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }

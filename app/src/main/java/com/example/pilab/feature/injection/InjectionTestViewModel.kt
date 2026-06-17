@@ -30,6 +30,8 @@ data class InjectionTestUiState(
     val reportSource: AnalysisSource? = null,
     val lastRequestPayload: String? = null,
     val lastResponsePayload: String? = null,
+    val backendHealth: BackendHealth? = null,
+    val isCheckingBackend: Boolean = false,
     val statusMessage: String? = null,
     val errorMessage: String? = null
 )
@@ -42,6 +44,20 @@ class InjectionTestViewModel(
 
     val histories: StateFlow<List<InjectionHistory>> = repository.observeHistories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun refreshBackendHealth() {
+        if (_uiState.value.isCheckingBackend) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCheckingBackend = true) }
+            val health = repository.checkBackendHealth()
+            _uiState.update {
+                it.copy(
+                    backendHealth = health,
+                    isCheckingBackend = false
+                )
+            }
+        }
+    }
 
     fun startNewTest() {
         _uiState.value = InjectionTestUiState()
@@ -90,7 +106,7 @@ class InjectionTestViewModel(
                 result = null,
                 report = null,
                 savedHistoryId = null,
-                statusMessage = "예시 공격 프롬프트를 불러왔습니다."
+                statusMessage = "예시를 불러왔어요."
             )
         }
     }
@@ -103,11 +119,11 @@ class InjectionTestViewModel(
         val state = _uiState.value
         val scenario = state.selectedScenario
         if (scenario == null) {
-            _uiState.update { it.copy(errorMessage = "먼저 평가할 시나리오를 선택하세요.") }
+            _uiState.update { it.copy(errorMessage = "시나리오를 선택하세요.") }
             return
         }
         if (state.prompt.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "검증할 공격 프롬프트를 입력하세요.") }
+            _uiState.update { it.copy(errorMessage = "검증할 입력을 작성하세요.") }
             return
         }
 
@@ -115,7 +131,7 @@ class InjectionTestViewModel(
             _uiState.update {
                 it.copy(
                     isRunning = true,
-                    currentStep = "평가 요청을 준비하는 중",
+                    currentStep = "평가를 준비하고 있어요",
                     result = null,
                     report = null,
                     savedHistoryId = null,
@@ -129,7 +145,7 @@ class InjectionTestViewModel(
             }
             try {
                 _uiState.update {
-                    it.copy(currentStep = "${levelLabelKo(state.selectedLevel)} target 실행 및 응답 평가 중")
+                    it.copy(currentStep = "${levelLabelKo(state.selectedLevel)} 방어 수준을 평가하고 있어요")
                 }
                 val outcome = repository.runTest(scenario, state.prompt, state.selectedLevel)
                 _uiState.update {
@@ -151,7 +167,7 @@ class InjectionTestViewModel(
                     it.copy(
                         isRunning = false,
                         currentStep = null,
-                        errorMessage = exception.message ?: "평가 실행에 실패했습니다."
+                        errorMessage = exception.message ?: "평가를 실행하지 못했어요."
                     )
                 }
                 onFailure()
@@ -164,11 +180,11 @@ class InjectionTestViewModel(
         val scenario = state.selectedScenario
         val result = state.result
         if (scenario == null || result == null) {
-            _uiState.update { it.copy(errorMessage = "저장할 평가 결과가 없습니다.") }
+            _uiState.update { it.copy(errorMessage = "저장할 결과가 없어요.") }
             return
         }
         if (state.savedHistoryId != null) {
-            _uiState.update { it.copy(statusMessage = "이미 저장된 결과입니다.") }
+            _uiState.update { it.copy(statusMessage = "이미 저장됐어요.") }
             return
         }
         viewModelScope.launch {
@@ -178,12 +194,12 @@ class InjectionTestViewModel(
                 _uiState.update {
                     it.copy(
                         savedHistoryId = historyId,
-                        statusMessage = "평가 결과를 히스토리에 저장했습니다."
+                        statusMessage = "결과를 저장했어요."
                     )
                 }
             }.onFailure { throwable ->
                 _uiState.update {
-                    it.copy(errorMessage = throwable.message ?: "결과를 저장하지 못했습니다.")
+                    it.copy(errorMessage = throwable.message ?: "저장하지 못했어요.")
                 }
             }
         }
@@ -194,7 +210,7 @@ class InjectionTestViewModel(
         val scenario = state.selectedScenario
         val result = state.result
         if (scenario == null || result == null) {
-            _uiState.update { it.copy(errorMessage = "리포트를 생성하려면 먼저 평가를 실행하세요.") }
+            _uiState.update { it.copy(errorMessage = "먼저 평가를 실행하세요.") }
             return
         }
         if (state.report != null) {
@@ -205,7 +221,7 @@ class InjectionTestViewModel(
             _uiState.update {
                 it.copy(
                     isRunning = true,
-                    currentStep = "보안 리포트 생성 중",
+                    currentStep = "보안 리포트를 만들고 있어요",
                     errorMessage = null,
                     statusMessage = null
                 )
@@ -222,11 +238,11 @@ class InjectionTestViewModel(
                 _uiState.update {
                     it.copy(
                         isRunning = false,
-                        currentStep = "리포트 준비 완료",
+                        currentStep = "보안 리포트 준비 완료",
                         report = outcome.report,
                         savedHistoryId = historyId,
                         reportSource = outcome.source,
-                        statusMessage = outcome.message ?: "보안 리포트를 생성했습니다."
+                        statusMessage = outcome.message ?: "보안 리포트를 만들었어요."
                     )
                 }
                 onComplete()
@@ -237,7 +253,7 @@ class InjectionTestViewModel(
                     it.copy(
                         isRunning = false,
                         currentStep = null,
-                        errorMessage = exception.message ?: "리포트를 생성하지 못했습니다."
+                        errorMessage = exception.message ?: "보안 리포트를 만들지 못했어요."
                     )
                 }
             }
@@ -248,7 +264,7 @@ class InjectionTestViewModel(
         viewModelScope.launch {
             val history = repository.getHistory(historyId)
             if (history == null) {
-                _uiState.update { it.copy(errorMessage = "히스토리 항목을 찾을 수 없습니다.") }
+                _uiState.update { it.copy(errorMessage = "기록을 찾을 수 없어요.") }
                 return@launch
             }
             val scenario = Scenarios.find(history.scenario) ?: Scenarios.all.first()
@@ -284,17 +300,21 @@ class InjectionTestViewModel(
             }.onSuccess {
                 _uiState.update { state ->
                     if (state.savedHistoryId == historyId) {
-                        InjectionTestUiState(statusMessage = "히스토리 항목을 삭제했습니다.")
+                        InjectionTestUiState(statusMessage = "기록을 삭제했어요.")
                     } else {
-                        state.copy(statusMessage = "히스토리 항목을 삭제했습니다.")
+                        state.copy(statusMessage = "기록을 삭제했어요.")
                     }
                 }
             }.onFailure { throwable ->
                 _uiState.update {
-                    it.copy(errorMessage = throwable.message ?: "히스토리 항목을 삭제하지 못했습니다.")
+                    it.copy(errorMessage = throwable.message ?: "삭제하지 못했어요.")
                 }
             }
         }
+    }
+
+    fun showStatusMessage(message: String) {
+        _uiState.update { it.copy(statusMessage = message) }
     }
 
     fun clearError() {

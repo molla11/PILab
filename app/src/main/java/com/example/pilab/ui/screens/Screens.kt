@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.FactCheck
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.History
@@ -78,9 +79,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.pilab.BuildConfig
@@ -90,6 +94,7 @@ import com.example.pilab.core.model.InjectionHistory
 import com.example.pilab.core.model.InjectionTestResult
 import com.example.pilab.core.model.LevelResult
 import com.example.pilab.core.model.Scenario
+import com.example.pilab.core.model.SecurityReport
 import com.example.pilab.core.model.TestLevel
 import com.example.pilab.feature.injection.AnalysisSource
 import com.example.pilab.feature.injection.InjectionTestUiState
@@ -127,12 +132,12 @@ fun HomeScreen(
                         BlinkingCursor()
                     }
                     Text(
-                        "prompt-injection-lab:~$ run scenario-audit",
+                        "prompt-injection-lab:~$ start",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.secondary
                     )
                     Text(
-                        "시나리오별 target assistant를 먼저 실행한 뒤 응답 근거로 프롬프트 인젝션 위험을 평가합니다.",
+                        "입력이 방어 수준별로 어떻게 평가되는지 확인하세요.",
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
@@ -140,13 +145,13 @@ fun HomeScreen(
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     TerminalButton(
-                        label = "새 평가 시작",
+                        label = "평가 시작",
                         onClick = onStartTest,
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.PlayArrow
                     )
                     TerminalOutlinedButton(
-                        label = "히스토리",
+                        label = "기록",
                         onClick = onHistory,
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.History
@@ -163,12 +168,12 @@ fun HomeScreen(
             item {
                 InfoPanel(
                     title = "평가 흐름",
-                    body = "시나리오 선택, 공격 프롬프트 입력, 방어 단계 선택, target 실행, 응답 평가, 상세 점수와 리포트 확인 순서로 진행됩니다."
+                    body = "시나리오, 검증할 입력, 방어 수준을 차례로 고릅니다."
                 )
             }
             item { SectionTitle("최근 평가") }
             if (histories.isEmpty()) {
-                item { EmptyState("저장된 평가 결과가 없습니다. 첫 평가를 실행하고 결과를 저장하면 여기에 표시됩니다.") }
+                item { EmptyState("아직 평가 기록이 없어요.", "평가 시작", onStartTest) }
             } else {
                 items(histories.take(3), key = { it.id }) { history ->
                     HistoryCard(history = history, onOpen = { onOpenHistory(history.id) })
@@ -195,8 +200,8 @@ fun ScenarioSelectScreen(
         ) {
             item {
                 InfoPanel(
-                    title = "평가 대상",
-                    body = "선택한 시나리오의 역할, 허용 행동, 차단 행동이 평가 기준으로 사용됩니다."
+                    title = "대상 시나리오",
+                    body = "검증할 입력을 적용할 대상 정책 맥락을 고르세요."
                 )
             }
             items(Scenarios.all, key = { it.id.name }) { scenario ->
@@ -217,11 +222,12 @@ fun ScenarioSelectScreen(
 fun PromptInputScreen(
     viewModel: InjectionTestViewModel,
     onBack: () -> Unit,
-    onNext: () -> Unit,
-    onSetup: () -> Unit
+    onChangeLevel: () -> Unit,
+    onSetup: () -> Unit,
+    onRun: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
-    PilabScaffold(title = "공격 프롬프트 입력", onBack = onBack, viewModel = viewModel) { padding ->
+    PilabScaffold(title = "검증할 입력", onBack = onBack, viewModel = viewModel) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -233,31 +239,41 @@ fun PromptInputScreen(
             state.selectedScenario?.let {
                 InfoPanel(title = it.title, body = it.description)
             }
-            OutlinedTextField(
-                value = state.prompt,
-                onValueChange = viewModel::updatePrompt,
-                label = { Text("검증할 공격 프롬프트") },
-                prefix = { Text("user@pilab:~$ ", color = MaterialTheme.colorScheme.secondary) },
-                supportingText = {
-                    Text("사용자 입력, 문서, 코드 주석처럼 target assistant가 받을 수 있는 내용을 넣으세요.")
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    focusedLabelColor = MaterialTheme.colorScheme.secondary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unfocusedSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                ),
-                shape = RectangleShape,
-                minLines = 8,
-                modifier = Modifier.fillMaxWidth()
+            InfoPanel(
+                title = "방어 수준",
+                body = "${levelLabelKo(state.selectedLevel.label)} - ${levelDescription(state.selectedLevel)}"
             )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    "user@pilab:~$",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                OutlinedTextField(
+                    value = state.prompt,
+                    onValueChange = viewModel::updatePrompt,
+                    label = { Text("검증할 입력") },
+                    supportingText = {
+                        Text("대상 assistant가 받을 사용자 요청, 문서, 댓글, 코드 주석을 그대로 넣으세요.")
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedLabelColor = MaterialTheme.colorScheme.secondary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unfocusedSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    shape = RectangleShape,
+                    minLines = 8,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             Text("${state.prompt.length}자", style = MaterialTheme.typography.labelMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 TerminalOutlinedButton(
@@ -265,15 +281,22 @@ fun PromptInputScreen(
                     onClick = viewModel::loadExamplePrompt,
                     modifier = Modifier.weight(1f)
                 )
-                TerminalButton(
-                    label = "방어 단계 선택",
-                    onClick = onNext,
+                TerminalOutlinedButton(
+                    label = "방어 수준 변경",
+                    onClick = onChangeLevel,
                     modifier = Modifier.weight(1f),
-                    enabled = state.prompt.isNotBlank()
+                    icon = Icons.AutoMirrored.Filled.FactCheck
                 )
             }
+            TerminalButton(
+                label = "평가 실행",
+                onClick = onRun,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = state.selectedScenario != null && state.prompt.isNotBlank() && !state.isRunning,
+                icon = Icons.Default.BugReport
+            )
             TerminalOutlinedButton(
-                label = "현재 설정 보기",
+                label = "현재 설정",
                 onClick = onSetup,
                 modifier = Modifier.fillMaxWidth(),
                 icon = Icons.Default.Security
@@ -287,10 +310,12 @@ fun LevelSelectScreen(
     viewModel: InjectionTestViewModel,
     onBack: () -> Unit,
     onSetup: () -> Unit,
+    onInput: () -> Unit,
     onRun: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
-    PilabScaffold(title = "방어 단계 선택", onBack = onBack, viewModel = viewModel) { padding ->
+    val hasPrompt = state.prompt.isNotBlank()
+    PilabScaffold(title = "방어 수준 선택", onBack = onBack, viewModel = viewModel) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -309,18 +334,26 @@ fun LevelSelectScreen(
             }
             Spacer(Modifier.weight(1f))
             TerminalOutlinedButton(
-                label = "현재 설정 검토",
+                label = "현재 설정",
                 onClick = onSetup,
                 modifier = Modifier.fillMaxWidth(),
                 icon = Icons.Default.Info
             )
             TerminalButton(
-                label = "평가 실행",
-                onClick = onRun,
+                label = if (hasPrompt) "평가 실행" else "입력 작성",
+                onClick = if (hasPrompt) onRun else onInput,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = state.selectedScenario != null && state.prompt.isNotBlank() && !state.isRunning,
-                icon = Icons.Default.BugReport
+                enabled = state.selectedScenario != null && !state.isRunning,
+                icon = if (hasPrompt) Icons.Default.BugReport else Icons.Default.PlayArrow
             )
+            if (hasPrompt) {
+                TerminalOutlinedButton(
+                    label = "입력으로",
+                    onClick = onInput,
+                    modifier = Modifier.fillMaxWidth(),
+                    icon = Icons.Default.PlayArrow
+                )
+            }
         }
     }
 }
@@ -336,24 +369,46 @@ fun RunningTestScreen(viewModel: InjectionTestViewModel) {
                 .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {
-            TerminalPane(title = "RUNNING TEST", modifier = Modifier.fillMaxWidth()) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            TerminalPane(title = "평가 중", modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     CircularProgressIndicator(
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.outline
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("[RUN] ${state.currentStep ?: "분석 시작 중"}", style = MaterialTheme.typography.titleMedium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            state.currentStep ?: "분석을 시작하고 있어요",
+                            modifier = Modifier.weight(1f, fill = false),
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.width(8.dp))
                         BlinkingCursor()
                     }
                     Text(
-                        "TARGET: ${state.selectedScenario?.title.orEmpty()} / LEVEL: ${levelLabelKo(state.selectedLevel.label)}",
+                        "${state.selectedScenario?.title.orEmpty()} / ${levelLabelKo(state.selectedLevel.label)}",
+                        modifier = Modifier.fillMaxWidth(),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = MaterialTheme.colorScheme.secondary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        "모델 기반 분석은 네트워크와 모델 응답 시간에 따라 지연될 수 있습니다.",
-                        style = MaterialTheme.typography.bodySmall
+                        "응답에 시간이 걸릴 수 있어요.",
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -396,7 +451,7 @@ fun ResultSummaryScreen(
                 }
             }
             item {
-                SectionTitle("단계별 결과")
+                SectionTitle("방어 수준별 결과")
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     result.levelResults.forEach {
                         ScoreRow(
@@ -410,23 +465,23 @@ fun ResultSummaryScreen(
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     TerminalOutlinedButton(
-                        label = "상세 점수",
+                        label = "점수 보기",
                         onClick = onDetails,
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.Assessment
                     )
                     TerminalOutlinedButton(
-                        label = "대화/평가",
+                        label = "요청/응답 로그",
                         onClick = onTrace,
                         modifier = Modifier.weight(1f),
-                        enabled = state.lastRequestPayload != null || state.lastResponsePayload != null,
+                        enabled = result.levelResults.isNotEmpty(),
                         icon = Icons.Default.Description
                     )
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     TerminalButton(
-                        label = if (state.savedHistoryId == null) "결과 저장" else "저장됨",
+                        label = if (state.savedHistoryId == null) "저장" else "저장됨",
                         onClick = viewModel::saveResult,
                         modifier = Modifier.weight(1f),
                         enabled = state.savedHistoryId == null,
@@ -441,7 +496,7 @@ fun ResultSummaryScreen(
                     enabled = !state.isRunning,
                     icon = Icons.Default.Security
                 )
-                TerminalOutlinedButton(label = "홈으로", onClick = onBackHome, modifier = Modifier.fillMaxWidth())
+                TerminalOutlinedButton(label = "홈", onClick = onBackHome, modifier = Modifier.fillMaxWidth())
             }
         }
     }
@@ -461,10 +516,10 @@ fun DetailScoresScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (scores == null) {
-                item { EmptyState("상세 점수가 없습니다. 먼저 평가를 실행하세요.") }
+                item { EmptyState("상세 점수가 없어요.", "돌아가기", onBack) }
             } else {
                 item { DetailScoresContent(scores) }
-                item { SectionTitle("레벨별 target 실행 증거") }
+                item { SectionTitle("방어 수준별 실행 근거") }
                 items(result?.levelResults.orEmpty()) { levelResult ->
                     TargetEvidenceCard(levelResult)
                 }
@@ -477,6 +532,14 @@ fun DetailScoresScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
 fun SecurityReportScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
     val state by viewModel.uiState.collectAsState()
     val report = state.report
+    val reportCopyText = report?.let {
+        buildReportCopyText(
+            scenario = state.selectedScenario?.title,
+            level = levelLabelKo(state.selectedLevel.label),
+            source = state.reportSource,
+            report = it
+        )
+    }
     PilabScaffold(title = "보안 리포트", onBack = onBack, viewModel = viewModel) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -486,18 +549,27 @@ fun SecurityReportScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) 
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             if (report == null) {
-                item { EmptyState("생성된 리포트가 없습니다. 평가 결과 화면에서 보안 리포트를 생성하세요.") }
+                item { EmptyState("아직 보안 리포트가 없어요.", "돌아가기", onBack) }
             } else {
                 if (state.reportSource != null) {
-                    item { ResultSourceChip("리포트 출처", state.reportSource) }
+                    item { ResultSourceChip("분석", state.reportSource) }
+                }
+                item {
+                    CopyTextButton(
+                        label = "리포트 전체 복사",
+                        text = reportCopyText.orEmpty(),
+                        copiedMessage = "보안 리포트를 복사했어요.",
+                        viewModel = viewModel,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
                 item { InfoPanel("요약", report.summary) }
                 item { InfoPanel("공격 분석", report.attackAnalysis) }
-                item { InfoPanel("방어 단계 비교", report.modelComparison) }
+                item { InfoPanel("방어 수준별 비교", report.modelComparison) }
                 item {
                     SectionTitle("권장 조치")
                     if (report.recommendations.isEmpty()) {
-                        Text("권장 조치가 제공되지 않았습니다.", style = MaterialTheme.typography.bodyMedium)
+                        Text("추가 제안이 없어요.", style = MaterialTheme.typography.bodyMedium)
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             report.recommendations.forEachIndexed { index, recommendation ->
@@ -519,7 +591,7 @@ fun HistoryScreen(
 ) {
     val histories by viewModel.histories.collectAsState()
     var pendingDelete by remember { mutableStateOf<InjectionHistory?>(null) }
-    PilabScaffold(title = "히스토리", onBack = onBack, viewModel = viewModel) { padding ->
+    PilabScaffold(title = "기록", onBack = onBack, viewModel = viewModel) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -528,7 +600,7 @@ fun HistoryScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (histories.isEmpty()) {
-                item { EmptyState("저장된 결과가 없습니다.") }
+                item { EmptyState("저장된 평가 결과가 없어요.", "홈으로", onBack) }
             } else {
                 items(histories, key = { it.id }) { history ->
                     HistoryCard(
@@ -547,8 +619,8 @@ fun HistoryScreen(
             containerColor = MaterialTheme.colorScheme.surface,
             titleContentColor = MaterialTheme.colorScheme.primary,
             textContentColor = MaterialTheme.colorScheme.onSurface,
-            title = { Text("히스토리 삭제") },
-            text = { Text("${displayScenario(history.scenario)} 평가 결과를 삭제할까요? 연결된 리포트도 함께 삭제됩니다.") },
+            title = { Text("기록 삭제") },
+            text = { Text("${displayScenario(history.scenario)} 평가 결과를 삭제할까요? 보안 리포트도 함께 삭제돼요.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -558,7 +630,7 @@ fun HistoryScreen(
                     shape = RectangleShape,
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("[ 삭제 ]")
+                    Text("삭제")
                 }
             },
             dismissButton = {
@@ -567,7 +639,7 @@ fun HistoryScreen(
                     shape = RectangleShape,
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("[ 취소 ]")
+                    Text("취소")
                 }
             }
         )
@@ -578,7 +650,7 @@ fun HistoryScreen(
 fun CurrentSetupScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
     val state by viewModel.uiState.collectAsState()
     val scenario = state.selectedScenario
-    PilabScaffold(title = "현재 설정", onBack = onBack, viewModel = viewModel) { padding ->
+    PilabScaffold(title = "평가 설정", onBack = onBack, viewModel = viewModel) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -588,21 +660,21 @@ fun CurrentSetupScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
         ) {
             item {
                 InfoPanel(
-                    "평가 목적",
-                    "선택한 시나리오의 역할과 정책 경계를 기준으로 입력 프롬프트가 지시 무시, 역할 탈취, 프롬프트 노출, 정책 우회를 유도하는지 확인합니다."
+                    "평가 기준",
+                    "응답이 역할 변경, 정책 우회, 프롬프트 노출에 흔들리는지 봅니다."
                 )
             }
-            item { InfoPanel("시나리오", scenario?.title ?: "아직 선택되지 않았습니다.") }
+            item { InfoPanel("시나리오", scenario?.title ?: "아직 선택되지 않았어요.") }
             if (scenario != null) {
                 item { InfoPanel("대상 역할", scenario.role) }
                 item { BulletPanel("허용 행동", scenario.allowedActions) }
                 item { BulletPanel("차단 행동", scenario.blockedActions) }
             }
             item {
-                InfoPanel("방어 단계", "${levelLabelKo(state.selectedLevel.label)} - ${levelDescription(state.selectedLevel)}")
+                InfoPanel("방어 수준", "${levelLabelKo(state.selectedLevel.label)} - ${levelDescription(state.selectedLevel)}")
             }
-            item { InfoPanel("요청 대상", "${BuildConfig.PILAB_BASE_URL}api/injection/test") }
-            item { InfoPanel("공격 프롬프트", state.prompt.ifBlank { "아직 입력된 프롬프트가 없습니다." }) }
+            item { InfoPanel("서버", BuildConfig.PILAB_BASE_URL) }
+            item { InfoPanel("검증할 입력", state.prompt.ifBlank { "아직 입력이 없어요." }) }
         }
     }
 }
@@ -613,7 +685,17 @@ fun ChatTraceScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
     val result = state.result
     val requestPayload = state.lastRequestPayload
     val responsePayload = state.lastResponsePayload
-    PilabScaffold(title = "대화와 평가", onBack = onBack, viewModel = viewModel) { padding ->
+    val logCopyText = result?.let {
+        buildLogCopyText(
+            scenario = state.selectedScenario?.title,
+            level = levelLabelKo(state.selectedLevel.label),
+            source = state.analysisSource,
+            result = it,
+            requestPayload = requestPayload,
+            responsePayload = responsePayload
+        )
+    }
+    PilabScaffold(title = "요청/응답 로그", onBack = onBack, viewModel = viewModel) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -623,27 +705,56 @@ fun ChatTraceScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
         ) {
             item {
                 InfoPanel(
-                    "평가 근거",
-                    "각 방어 단계에서 target 서비스가 실제로 받은 사용자 입력과 생성한 응답을 먼저 보여주고, 그 아래에 평가 결과를 블록으로 정리합니다."
+                    "로그 범위",
+                    "방어 수준별 target prompt, target response, 판정을 확인합니다. 원문 payload는 클라이언트와 백엔드 사이의 요청/응답입니다."
                 )
             }
             if (result == null) {
-                item { EmptyState("표시할 평가 대화가 없습니다. 먼저 평가를 실행하세요.") }
+                item { EmptyState("표시할 평가 근거가 없어요.", "돌아가기", onBack) }
             } else {
+                item {
+                    CopyTextButton(
+                        label = "로그 전체 복사",
+                        text = logCopyText.orEmpty(),
+                        copiedMessage = "요청/응답 로그를 복사했어요.",
+                        viewModel = viewModel,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 items(result.levelResults) { levelResult ->
                     ConversationEvaluationCard(levelResult)
                 }
                 item {
-                    TerminalPane(title = "API DEBUG", modifier = Modifier.fillMaxWidth()) {
+                    TerminalPane(title = "API 요청/응답 원문", modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            "필요 시 서버 원문 JSON은 아래 요청/응답 페이로드로 확인할 수 있습니다.",
+                            "숨겨진 프롬프트 전체가 아니라 앱과 서버가 주고받은 payload입니다.",
                             style = MaterialTheme.typography.bodySmall
                         )
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                            if (!requestPayload.isNullOrBlank()) {
+                                CopyTextButton(
+                                    label = "요청 복사",
+                                    text = requestPayload,
+                                    copiedMessage = "요청 payload를 복사했어요.",
+                                    viewModel = viewModel,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (!responsePayload.isNullOrBlank()) {
+                                CopyTextButton(
+                                    label = "응답 복사",
+                                    text = responsePayload,
+                                    copiedMessage = "응답 payload를 복사했어요.",
+                                    viewModel = viewModel,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
                         if (!requestPayload.isNullOrBlank()) {
-                            EvidenceBlock("클라이언트 요청 JSON", requestPayload)
+                            EvidenceBlock("요청 payload", requestPayload)
                         }
                         if (!responsePayload.isNullOrBlank()) {
-                            EvidenceBlock("서버 응답 JSON", responsePayload)
+                            EvidenceBlock("응답 payload", responsePayload)
                         }
                     }
                 }
@@ -653,8 +764,14 @@ fun ChatTraceScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
-    PilabScaffold(title = "설정", onBack = onBack) { padding ->
+fun SettingsScreen(viewModel: InjectionTestViewModel, onBack: () -> Unit) {
+    val state by viewModel.uiState.collectAsState()
+    LaunchedEffect(Unit) {
+        if (state.backendHealth == null) {
+            viewModel.refreshBackendHealth()
+        }
+    }
+    PilabScaffold(title = "설정", onBack = onBack, viewModel = viewModel) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -662,23 +779,53 @@ fun SettingsScreen(onBack: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            item { InfoPanel("API 기본 주소", BuildConfig.PILAB_BASE_URL) }
+            item { InfoPanel("서버 주소", BuildConfig.PILAB_BASE_URL) }
+            item {
+                val health = state.backendHealth
+                val statusText = when {
+                    state.isCheckingBackend -> "확인 중"
+                    health?.reachable == true -> "연결됨 (${health.status})"
+                    health?.reachable == false -> "연결 실패"
+                    else -> "확인 전"
+                }
+                val modelText = when {
+                    health?.reachable == true && health.openRouterConfigured -> "OpenRouter 키 설정됨"
+                    health?.reachable == true -> "OpenRouter 키 없음, 서버 휴리스틱 fallback 사용"
+                    else -> health?.message ?: "아직 서버 상태를 확인하지 않았어요."
+                }
+                InfoPanel(
+                    "서버 상태",
+                    "$statusText\n$modelText"
+                )
+            }
+            item {
+                TerminalOutlinedButton(
+                    label = if (state.isCheckingBackend) "확인 중" else "상태 새로고침",
+                    onClick = viewModel::refreshBackendHealth,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.isCheckingBackend,
+                    icon = Icons.Default.Settings
+                )
+            }
+            val models = state.backendHealth?.models.orEmpty()
+            if (models.isNotEmpty()) {
+                item {
+                    BulletPanel(
+                        "모델 설정",
+                        models.map { (label, model) -> "$label: $model" }
+                    )
+                }
+            }
             item {
                 InfoPanel(
-                    "분석 출처 우선순위",
-                    "서버에 OpenRouter 키가 있으면 모델 기반 분석을 사용합니다. 서버 분석이 실패하면 서버 휴리스틱으로, 서버 연결이 불가능하면 앱 내 휴리스틱으로 대체합니다."
+                    "분석 방식",
+                    "OpenRouter 모델 분석 -> 서버 휴리스틱 분석 -> 기기 휴리스틱 분석 순서로 fallback합니다."
                 )
             }
             item {
                 InfoPanel(
-                    "로컬 저장소",
-                    "저장한 평가 결과와 생성된 리포트는 기기 내 Room 데이터베이스에 저장됩니다."
-                )
-            }
-            item {
-                InfoPanel(
-                    "운영 점검 항목",
-                    "향후 설정 화면에는 백엔드 헬스 체크, 사용 모델, 타임아웃, 전체 히스토리 삭제 기능을 추가하는 것이 좋습니다."
+                    "저장 위치",
+                    "평가 결과와 보안 리포트는 이 기기에 저장돼요."
                 )
             }
         }
@@ -818,6 +965,27 @@ private fun TerminalOutlinedButton(
 }
 
 @Composable
+private fun CopyTextButton(
+    label: String,
+    text: String,
+    copiedMessage: String,
+    viewModel: InjectionTestViewModel,
+    modifier: Modifier = Modifier
+) {
+    val clipboard = LocalClipboardManager.current
+    TerminalOutlinedButton(
+        label = label,
+        onClick = {
+            clipboard.setText(AnnotatedString(text))
+            viewModel.showStatusMessage(copiedMessage)
+        },
+        modifier = modifier,
+        enabled = text.isNotBlank(),
+        icon = Icons.Default.ContentCopy
+    )
+}
+
+@Composable
 private fun TerminalButtonContent(label: String, icon: ImageVector?) {
     if (icon != null) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -921,7 +1089,7 @@ private fun BlinkingCursor(modifier: Modifier = Modifier) {
 private fun ScenarioCard(scenario: Scenario, selected: Boolean, onClick: () -> Unit) {
     SelectableCard(
         title = scenario.title,
-        body = "${scenario.description}\n\n역할: ${scenario.role}\n차단: ${scenario.blockedActions.joinToString()}",
+        body = "${scenario.description}\n차단: ${scenario.blockedActions.joinToString()}",
         selected = selected,
         onClick = onClick,
         icon = when (scenario.id.name) {
@@ -971,19 +1139,19 @@ private fun SelectableCard(
 private fun RiskCard(result: InjectionTestResult) {
     val tone = riskColor(result.finalRiskScore)
     TerminalPane(
-        title = "RISK REPORT",
+        title = "잔여 취약 가능성",
         modifier = Modifier.fillMaxWidth(),
         borderColor = tone,
         contentPadding = PaddingValues(18.dp)
     ) {
         Text(
-            "SCORE: ${result.finalRiskScore} / 100",
+            "잔여 취약성 ${result.finalRiskScore}/100",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             color = tone
         )
         Text(
-            "STATUS: ${riskLevelKo(result.riskLevel)}",
+            riskLevelKo(result.riskLevel),
             style = MaterialTheme.typography.titleMedium,
             color = tone
         )
@@ -994,13 +1162,13 @@ private fun RiskCard(result: InjectionTestResult) {
 
 @Composable
 private fun ResultMetaPanel(source: AnalysisSource?, historyId: Long?) {
-    TerminalPane(title = "SESSION", modifier = Modifier.fillMaxWidth()) {
-        ResultSourceChip("분석 출처", source)
+    TerminalPane(title = "저장/분석 상태", modifier = Modifier.fillMaxWidth()) {
+        ResultSourceChip("분석", source)
         Text(
             if (historyId == null) {
-                "[WARN] 아직 히스토리에 저장되지 않았습니다."
+                "아직 저장되지 않았어요."
             } else {
-                "[OK] 히스토리 #$historyId 항목으로 저장되었습니다."
+                "기록 #${historyId}에 저장됐어요."
             },
             style = MaterialTheme.typography.bodySmall,
             color = if (historyId == null) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
@@ -1011,10 +1179,10 @@ private fun ResultMetaPanel(source: AnalysisSource?, historyId: Long?) {
 @Composable
 private fun ResultSourceChip(label: String, source: AnalysisSource?) {
     val value = when (source) {
-        AnalysisSource.API -> "API"
-        AnalysisSource.OPENROUTER -> "OpenRouter"
-        AnalysisSource.SERVER_FALLBACK -> "서버 휴리스틱"
-        AnalysisSource.MOCK -> "앱 내 휴리스틱"
+        AnalysisSource.API -> "서버"
+        AnalysisSource.OPENROUTER -> "모델"
+        AnalysisSource.SERVER_FALLBACK -> "서버 간이 분석"
+        AnalysisSource.MOCK -> "기기 간이 분석"
         null -> "저장된 결과"
     }
     TerminalTag("$label: $value")
@@ -1034,39 +1202,39 @@ private fun TerminalTag(text: String, color: Color = MaterialTheme.colorScheme.p
 @Composable
 private fun DetailScoresContent(scores: DetailScores) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        ScoreRow("지시 무시", scores.instructionOverride, "기존 지침을 무시하거나 덮어쓰려는 신호")
-        ScoreRow("역할 탈취", scores.roleHijacking, "assistant의 역할을 관리자, 개발자, 승인자로 바꾸려는 신호")
-        ScoreRow("프롬프트 노출", scores.promptLeakage, "시스템 프롬프트나 숨겨진 정책 공개를 요구하는 신호")
-        ScoreRow("정책 우회", scores.policyBypass, "금지, 제한, 정책 경계를 우회하려는 신호")
-        ScoreRow("출력 조작", scores.outputManipulation, "정해진 문구나 형식만 출력하도록 강제하는 신호")
-        ScoreRow("모델 취약도", scores.modelVulnerability, "선택한 방어 단계에서 남은 종합 취약도")
+        ScoreRow("지시 무시", scores.instructionOverride, "기존 지침을 무시하려는 신호")
+        ScoreRow("역할 탈취", scores.roleHijacking, "역할을 바꾸려는 신호")
+        ScoreRow("프롬프트 노출", scores.promptLeakage, "숨겨진 지침을 요구하는 신호")
+        ScoreRow("정책 우회", scores.policyBypass, "정책 경계를 넘으려는 신호")
+        ScoreRow("출력 조작", scores.outputManipulation, "답변 형식을 강제하는 신호")
+        ScoreRow("잔여 취약성", scores.modelVulnerability, "선택한 방어 수준에서 남은 취약 가능성")
     }
 }
 
 @Composable
 private fun TargetEvidenceCard(levelResult: LevelResult) {
-    TerminalPane(title = "${levelLabelKo(levelResult.level)} TARGET", modifier = Modifier.fillMaxWidth()) {
-        EvidenceBlock("대상 시스템 프롬프트", levelResult.targetSystemPrompt ?: "제공되지 않았습니다.")
-        EvidenceBlock("공격 입력", levelResult.targetUserPrompt ?: "제공되지 않았습니다.")
-        EvidenceBlock("대상 응답", levelResult.targetResponse ?: "제공되지 않았습니다.")
+    TerminalPane(title = "${levelLabelKo(levelResult.level)} 실행 근거", modifier = Modifier.fillMaxWidth()) {
+        EvidenceBlock("시스템 지침", levelResult.targetSystemPrompt ?: "없어요.")
+        EvidenceBlock("검증 입력", levelResult.targetUserPrompt ?: "없어요.")
+        EvidenceBlock("응답", levelResult.targetResponse ?: "없어요.")
     }
 }
 
 @Composable
 private fun ConversationEvaluationCard(levelResult: LevelResult) {
-    TerminalPane(title = "${levelLabelKo(levelResult.level)} TRACE", modifier = Modifier.fillMaxWidth()) {
+    TerminalPane(title = "${levelLabelKo(levelResult.level)} 대화", modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("LEVEL", style = MaterialTheme.typography.labelLarge)
+            Text("잔여 취약성", style = MaterialTheme.typography.labelLarge)
             Text("${levelResult.vulnerabilityScore}/100", style = MaterialTheme.typography.labelLarge, color = riskColor(levelResult.vulnerabilityScore))
         }
         ConversationBubble(
-            label = "사용자가 보낸 프롬프트",
-            body = levelResult.targetUserPrompt ?: "제공되지 않았습니다.",
+            label = "사용자 입력",
+            body = levelResult.targetUserPrompt ?: "없어요.",
             isUser = true
         )
         ConversationBubble(
-            label = "서비스 응답",
-            body = levelResult.targetResponse ?: "제공되지 않았습니다.",
+            label = "응답",
+            body = levelResult.targetResponse ?: "없어요.",
             isUser = false
         )
         EvaluationBlock(levelResult)
@@ -1093,9 +1261,9 @@ private fun ConversationBubble(label: String, body: String, isUser: Boolean) {
 @Composable
 private fun EvaluationBlock(levelResult: LevelResult) {
     val tone = riskColor(levelResult.vulnerabilityScore)
-    TerminalPane(title = "EVALUATION", modifier = Modifier.fillMaxWidth(), borderColor = tone) {
+    TerminalPane(title = "판정", modifier = Modifier.fillMaxWidth(), borderColor = tone) {
         Text(
-            "${resultLabelKo(levelResult.result)} / RISK ${levelResult.vulnerabilityScore}/100",
+            "${resultLabelKo(levelResult.result)} / 잔여 취약성 ${levelResult.vulnerabilityScore}/100",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             color = tone
@@ -1149,12 +1317,12 @@ private fun HistoryCard(history: InjectionHistory, onOpen: () -> Unit, onDelete:
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(formatDate(history.createdAt), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
                 Text(displayScenario(history.scenario), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("RISK: ${history.result.finalRiskScore}/100 (${riskLevelKo(history.result.riskLevel)})", color = riskColor(history.result.finalRiskScore))
+                Text("잔여 취약성 ${history.result.finalRiskScore}/100 (${riskLevelKo(history.result.riskLevel)})", color = riskColor(history.result.finalRiskScore))
                 Text(history.prompt, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
             }
             if (onDelete != null) {
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "히스토리 삭제", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Default.Delete, contentDescription = "기록 삭제", tint = MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -1199,9 +1367,12 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun EmptyState(message: String) {
-    TerminalPane(title = "EMPTY", modifier = Modifier.fillMaxWidth(), borderColor = MaterialTheme.colorScheme.secondary) {
-        Text("[WARN] $message", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+private fun EmptyState(message: String, ctaLabel: String? = null, onCta: (() -> Unit)? = null) {
+    TerminalPane(title = "비어 있음", modifier = Modifier.fillMaxWidth(), borderColor = MaterialTheme.colorScheme.secondary) {
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+        if (ctaLabel != null && onCta != null) {
+            TerminalOutlinedButton(label = ctaLabel, onClick = onCta, modifier = Modifier.fillMaxWidth())
+        }
     }
 }
 
@@ -1214,23 +1385,23 @@ private fun EmptyResult(modifier: Modifier, onBackHome: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("표시할 평가 결과가 없습니다.")
+        Text("표시할 평가 결과가 없어요.")
         Spacer(Modifier.height(12.dp))
         TerminalButton(label = "홈으로", onClick = onBackHome)
     }
 }
 
 private fun reportButtonLabel(state: InjectionTestUiState): String = when {
-    state.isRunning -> "생성 중..."
-    state.report != null -> "보안 리포트 보기"
-    else -> "보안 리포트 생성"
+    state.isRunning -> "생성 중"
+    state.report != null -> "리포트 보기"
+    else -> "리포트 만들기"
 }
 
 private fun levelDescription(level: TestLevel): String = when (level) {
-    TestLevel.LOW -> "서비스 설정, 운영 메모, 공격 입력을 같은 user 메시지에 넣고 최신 override를 우선하는 매우 취약한 기준입니다."
-    TestLevel.MEDIUM -> "역할과 차단 행동을 system에 두고 명백한 우회 요청을 거절하지만, 출력 검증은 제한적인 기준입니다."
-    TestLevel.HIGH -> "사용자 입력을 데이터로 분리하고 엄격한 거절 규칙을 적용한 강화 방어 기준입니다."
-    TestLevel.ALL -> "낮음, 중간, 높음 단계를 모두 실행하고 결과를 비교합니다."
+    TestLevel.LOW -> "서비스 설정과 검증 입력이 같은 사용자 수준으로 전달되는 취약한 기준선입니다."
+    TestLevel.MEDIUM -> "역할과 차단 행동을 시스템 지침에 두지만 QA/운영 점검 형식에는 흔들릴 수 있습니다."
+    TestLevel.HIGH -> "지침과 데이터를 엄격히 분리하고 차단 행동을 명시적으로 거절합니다."
+    TestLevel.ALL -> "낮음, 중간, 높음을 모두 실행해 비교합니다."
 }
 
 private fun riskColor(score: Int): Color = when (score) {
@@ -1240,11 +1411,11 @@ private fun riskColor(score: Int): Color = when (score) {
 }
 
 private fun riskDescription(score: Int): String = when (score) {
-    in 0..20 -> "선택한 방어 기준에서 공격 성공 가능성이 낮습니다."
-    in 21..40 -> "일부 위험 신호가 있으나 방어가 대체로 유지됩니다."
-    in 41..60 -> "방어 경계가 흔들릴 수 있어 정책과 출력 검증 보강이 필요합니다."
-    in 61..80 -> "공격 성공 가능성이 높아 시나리오 정책을 강화해야 합니다."
-    else -> "정책 위반 가능성이 매우 높아 즉시 방어 설계를 재검토해야 합니다."
+    in 0..20 -> "선택한 방어 수준에서 잔여 취약 가능성이 낮습니다."
+    in 21..40 -> "일부 공격 신호가 있지만 방어가 대체로 유지됩니다."
+    in 41..60 -> "몇 가지 패턴이 응답을 흔들 수 있습니다."
+    in 61..80 -> "여러 방어 수준에서 잔여 취약 가능성이 높습니다."
+    else -> "대부분의 방어 수준에서 강한 취약 신호가 보입니다."
 }
 
 private fun formatDate(value: Long): String {
@@ -1259,16 +1430,16 @@ private fun levelLabelKo(value: String): String = when (value) {
     "Low" -> "낮음"
     "Medium" -> "중간"
     "High" -> "높음"
-    "All Levels" -> "전체 단계"
+    "All Levels" -> "전체 방어 수준"
     else -> value
 }
 
 private fun riskLevelKo(value: String): String = when (value) {
-    "Safe" -> "안전"
+    "Safe" -> "거의 안 통함"
     "Low" -> "낮음"
     "Medium" -> "중간"
     "High" -> "높음"
-    "Critical" -> "치명적"
+    "Critical" -> "매우 높음"
     else -> value
 }
 
@@ -1291,4 +1462,86 @@ private fun attackTypeKo(value: String): String = when (value) {
     "Data Exfiltration" -> "데이터 유출"
     "Potential Injection" -> "잠재적 인젝션"
     else -> value
+}
+
+private fun buildReportCopyText(
+    scenario: String?,
+    level: String,
+    source: AnalysisSource?,
+    report: SecurityReport
+): String = buildString {
+    appendLine("# PILab 보안 리포트")
+    appendLine()
+    appendLine("- 시나리오: ${scenario ?: "알 수 없음"}")
+    appendLine("- 방어 수준: $level")
+    appendLine("- 분석 출처: ${analysisSourceLabel(source)}")
+    appendLine()
+    appendLine("## 요약")
+    appendLine(report.summary)
+    appendLine()
+    appendLine("## 공격 분석")
+    appendLine(report.attackAnalysis)
+    appendLine()
+    appendLine("## 방어 수준별 비교")
+    appendLine(report.modelComparison)
+    appendLine()
+    appendLine("## 권장 조치")
+    if (report.recommendations.isEmpty()) {
+        appendLine("- 추가 제안 없음")
+    } else {
+        report.recommendations.forEach { recommendation ->
+            appendLine("- $recommendation")
+        }
+    }
+}
+
+private fun buildLogCopyText(
+    scenario: String?,
+    level: String,
+    source: AnalysisSource?,
+    result: InjectionTestResult,
+    requestPayload: String?,
+    responsePayload: String?
+): String = buildString {
+    appendLine("# PILab 요청/응답 로그")
+    appendLine()
+    appendLine("- 시나리오: ${scenario ?: "알 수 없음"}")
+    appendLine("- 선택 방어 수준: $level")
+    appendLine("- 분석 출처: ${analysisSourceLabel(source)}")
+    appendLine("- 최종 잔여 취약성: ${result.finalRiskScore}/100 (${riskLevelKo(result.riskLevel)})")
+    appendLine("- 탐지 유형: ${result.attackTypes.joinToString { attackTypeKo(it) }}")
+    appendLine()
+    result.levelResults.forEach { levelResult ->
+        appendLine("## ${levelLabelKo(levelResult.level)}")
+        appendLine("- 판정: ${resultLabelKo(levelResult.result)}")
+        appendLine("- 잔여 취약성: ${levelResult.vulnerabilityScore}/100")
+        appendLine("- 요약: ${levelResult.summary}")
+        appendLine()
+        appendLine("### Target System Prompt")
+        appendLine(levelResult.targetSystemPrompt ?: "없음")
+        appendLine()
+        appendLine("### Target User Prompt")
+        appendLine(levelResult.targetUserPrompt ?: "없음")
+        appendLine()
+        appendLine("### Target Response")
+        appendLine(levelResult.targetResponse ?: "없음")
+        appendLine()
+    }
+    if (!requestPayload.isNullOrBlank()) {
+        appendLine("## API Request Payload")
+        appendLine(requestPayload)
+        appendLine()
+    }
+    if (!responsePayload.isNullOrBlank()) {
+        appendLine("## API Response Payload")
+        appendLine(responsePayload)
+    }
+}
+
+private fun analysisSourceLabel(source: AnalysisSource?): String = when (source) {
+    AnalysisSource.API -> "서버"
+    AnalysisSource.OPENROUTER -> "모델"
+    AnalysisSource.SERVER_FALLBACK -> "서버 휴리스틱"
+    AnalysisSource.MOCK -> "기기 휴리스틱"
+    null -> "저장된 결과"
 }

@@ -6,6 +6,23 @@ import com.example.pilab.core.model.LevelResult
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class HealthResponseDto(
+    val status: String,
+    val service: String,
+    val openRouterConfigured: Boolean,
+    val models: HealthModelsDto
+)
+
+@Serializable
+data class HealthModelsDto(
+    val low: String,
+    val medium: String,
+    val high: String,
+    val analyzer: String,
+    val report: String
+)
+
+@Serializable
 data class InjectionTestRequestDto(
     val scenario: String,
     val prompt: String,
