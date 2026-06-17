@@ -1,4 +1,4 @@
-import { OpenRouter, stepCountIs, type StreamableOutputItem, type Tool } from '@openrouter/agent';
+import type { StreamableOutputItem, Tool } from '@openrouter/agent';
 import { EventEmitter } from 'eventemitter3';
 
 export interface Message {
@@ -76,6 +76,7 @@ export class Agent extends EventEmitter<AgentEvents> {
     this.emit('thinking:start');
 
     try {
+      const { stepCountIs } = await loadOpenRouterAgentRuntime();
       const client = await this.getClient();
       const result = client.callModel({
         model: this.config.model,
@@ -142,6 +143,7 @@ export class Agent extends EventEmitter<AgentEvents> {
     this.emit('message:user', userMessage);
 
     try {
+      const { stepCountIs } = await loadOpenRouterAgentRuntime();
       const client = await this.getClient();
       const result = client.callModel({
         model: this.config.model,
@@ -164,6 +166,7 @@ export class Agent extends EventEmitter<AgentEvents> {
 
   private async getClient(): Promise<OpenRouterClient> {
     if (!this.client) {
+      const { OpenRouter } = await loadOpenRouterAgentRuntime();
       this.client = new OpenRouter({ apiKey: this.config.apiKey });
     }
     return this.client as OpenRouterClient;
@@ -182,4 +185,14 @@ function safeParseJson(value: string): unknown {
   }
 }
 
-type OpenRouterClient = InstanceType<typeof OpenRouter>;
+type OpenRouterAgentRuntime = typeof import('@openrouter/agent');
+type OpenRouterClient = InstanceType<OpenRouterAgentRuntime['OpenRouter']>;
+
+let runtimePromise: Promise<OpenRouterAgentRuntime> | undefined;
+
+function loadOpenRouterAgentRuntime(): Promise<OpenRouterAgentRuntime> {
+  runtimePromise ??= (new Function('specifier', 'return import(specifier)') as (
+    specifier: string
+  ) => Promise<OpenRouterAgentRuntime>)('@openrouter/agent');
+  return runtimePromise;
+}

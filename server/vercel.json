@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "src/main.ts": {
+      "includeFiles": [
+        "node_modules/@openrouter/agent/**",
+        "node_modules/@openrouter/sdk/**"
+      ]
+    }
+  }
+}
